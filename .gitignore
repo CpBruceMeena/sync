@@ -73,3 +73,10 @@ crg-cache/
 .cache/crg/
 *.crg
 .code-review-graph/
+
+# Next.js build output
+.next/
+next-env.d.ts
+
+# Screenshots
+screenshots/

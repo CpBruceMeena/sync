@@ -20,7 +20,7 @@ if [ -f ".env" ]; then
     source .env
     set +a
     echo -e "${GREEN}Loaded environment from .env${NC}"
-fi"
+fi
 
 # Check if Go is installed
 if ! command -v go &> /dev/null; then
