@@ -1,0 +1,9 @@
+#!/bin/bash
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
+  echo "ERROR: Direct pushes to $BRANCH are not allowed. Use a feature branch and create a PR."
+  exit 1
+fi
+
+echo "Push allowed."

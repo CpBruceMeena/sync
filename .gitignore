@@ -50,7 +50,7 @@ debug.test
 
 # Go specific
 backend/vendor/
-backend/chatsync
+backend/sync
 
 # Node specific
 frontend/node_modules/
@@ -65,4 +65,11 @@ frontend/yarn-debug.log*
 frontend/yarn-error.log*
 
 # Build output
-backend/static/build/ 
+.code-review-graph/
+.code_review_graph/
+code-review-graph-cache/
+crg-cache/
+.cache/code-review-graph/
+.cache/crg/
+*.crg
+.code-review-graph/
