@@ -140,7 +140,33 @@ A real-time communication platform built with **Go** (backend) and **Next.js** (
 - Go 1.23 or later
 - Node.js 18 or later
 - npm or yarn
-- PostgreSQL 16+
+- PostgreSQL 16+ *(optional — use Docker Compose instead)*
+- Docker & Docker Compose *(recommended for easy setup)*
+
+### Docker (Recommended)
+
+The fastest way to run the full stack:
+
+```bash
+# Start all services (PostgreSQL + backend + frontend)
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop everything
+docker compose down
+```
+
+Services:
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:8080 |
+| Swagger Docs | http://localhost:8080/swagger/index.html |
+| WebSocket | ws://localhost:8080/ws |
+
+### Manual Setup
 
 ### Database Setup
 
@@ -182,6 +208,9 @@ cd backend && go test ./tests/... -v
 
 # Frontend tests (11+ tests)
 cd frontend && npm test
+
+# Backend tests via Docker Compose (starts fresh PostgreSQL)
+docker compose run --rm test
 ```
 
 ## API Documentation
