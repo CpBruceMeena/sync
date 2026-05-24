@@ -1,0 +1,231 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { api } from "@/lib/api";
+import { useAuth } from "@/contexts/AuthContext";
+import { useWebSocket } from "@/contexts/WebSocketContext";
+import { useSelectedConv } from "@/contexts/SelectedConvContext";
+import { MessageInput } from "@/components/MessageInput";
+import type { Message, WSMessage } from "@/types";
+
+export default function ChatPage() {
+  const { user } = useAuth();
+  const { subscribe, sendMessage, onlineUsers } = useWebSocket();
+  const { selectedConv } = useSelectedConv();
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+
+  // Load messages when conversation is selected
+  useEffect(() => {
+    if (!selectedConv) return;
+
+    setLoadingMessages(true);
+    api
+      .getMessages(selectedConv.id)
+      .then((msgs) => setMessages(msgs.reverse()))
+      .catch(console.error)
+      .finally(() => setLoadingMessages(false));
+  }, [selectedConv]);
+
+  // Subscribe to new messages via WebSocket
+  useEffect(() => {
+    if (!selectedConv) return;
+
+    const unsub = subscribe("new_message", (data: WSMessage) => {
+      if (data.conversation_id === selectedConv.id && data.content) {
+        const newMsg: Message = {
+          id: data.message_id || "",
+          conversation_id: data.conversation_id || "",
+          sender_id: data.sender_id || "",
+          sender_username: data.sender_username || "",
+          content: data.content,
+          type: "text",
+          created_at: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, newMsg]);
+      }
+    });
+
+    return unsub;
+  }, [selectedConv, subscribe]);
+
+  const handleSendMessage = useCallback(
+    async (content: string) => {
+      if (!selectedConv || !content.trim()) return;
+
+      const tempId = `temp-${Date.now()}`;
+      const optimisticMsg: Message = {
+        id: tempId,
+        conversation_id: selectedConv.id,
+        sender_id: user?.id || "",
+        sender_username: user?.username || "",
+        content,
+        type: "text",
+        created_at: new Date().toISOString(),
+      };
+
+      setMessages((prev) => [...prev, optimisticMsg]);
+
+      try {
+        const msg = await api.sendMessage(selectedConv.id, content);
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? msg : m))
+        );
+
+        // Broadcast via WebSocket
+        sendMessage({
+          type: "new_message",
+          conversation_id: selectedConv.id,
+          content,
+          message_id: msg.id,
+        });
+      } catch (err) {
+        console.error("Failed to send message:", err);
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      }
+    },
+    [selectedConv, user, sendMessage]
+  );
+
+  if (!selectedConv) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center space-y-4"
+        >
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-[var(--surface-3)]">
+            <svg
+              className="w-10 h-10 text-[var(--text-muted)]"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+              />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-[var(--foreground)]">
+            Select a Conversation
+          </h2>
+          <p className="text-sm text-[var(--text-muted)] max-w-sm">
+            Choose a conversation from the sidebar or start a new one to begin
+            chatting
+          </p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex flex-col min-w-0">
+      {/* Chat header */}
+      <div className="glass px-6 py-3 flex items-center gap-3 border-b border-[var(--border)]">
+        <div className="relative">
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center text-white font-semibold text-sm">
+            {selectedConv.name
+              ? selectedConv.name.charAt(0).toUpperCase()
+              : selectedConv.members?.find((m) => m.user_id !== user?.id)
+                  ?.username?.charAt(0)
+                  .toUpperCase() || "?"}
+          </div>
+          {onlineUsers.includes(
+            selectedConv.members?.find((m) => m.user_id !== user?.id)?.user_id ||
+              ""
+          ) && (
+            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[var(--online)] border-2 border-[var(--surface)]" />
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-sm font-semibold text-[var(--foreground)] truncate">
+            {selectedConv.name ||
+              selectedConv.members?.find((m) => m.user_id !== user?.id)
+                ?.username ||
+              "Unknown"}
+          </h2>
+          <p className="text-xs text-[var(--text-muted)]">
+            {selectedConv.type === "group"
+              ? `${selectedConv.members?.length || 0} members`
+              : "Private conversation"}
+          </p>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1 smooth-scroll">
+        {loadingMessages ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="w-8 h-8 rounded-full border-2 border-[var(--primary)] border-t-transparent animate-spin" />
+          </div>
+        ) : (
+          <AnimatePresence initial={false}>
+            {messages.map((msg, i) => (
+              <motion.div
+                key={msg.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.15, delay: i * 0.01 }}
+              >
+                <MessageBubble
+                  message={msg}
+                  isOwn={msg.sender_id === user?.id}
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        )}
+      </div>
+
+      {/* Input */}
+      <MessageInput onSend={handleSendMessage} />
+    </div>
+  );
+}
+
+// Internal MessageBubble component
+function MessageBubble({
+  message,
+  isOwn,
+}: {
+  message: Message;
+  isOwn: boolean;
+}) {
+  return (
+    <div
+      className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-2 message-enter`}
+    >
+      <div
+        className={`max-w-[70%] rounded-2xl px-4 py-2 ${
+          isOwn
+            ? "bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-tr-md"
+            : "bg-[var(--surface-2)] border border-[var(--border)] text-[var(--foreground)] rounded-tl-md"
+        }`}
+      >
+        {!isOwn && (
+          <p className="text-xs font-medium text-[var(--accent)] mb-1">
+            {message.sender_username}
+          </p>
+        )}
+        <p className="text-sm whitespace-pre-wrap break-words">
+          {message.content}
+        </p>
+        <p
+          className={`text-[10px] mt-1 ${
+            isOwn ? "text-white/60" : "text-[var(--text-muted)]"
+          }`}
+        >
+          {new Date(message.created_at).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </p>
+      </div>
+    </div>
+  );
+}

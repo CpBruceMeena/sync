@@ -1,0 +1,19 @@
+#!/bin/bash
+
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
+  echo "ERROR: Direct commits to $BRANCH are not allowed. Use a feature branch."
+  exit 1
+fi
+
+echo "Running backend tests..."
+cd backend
+go test ./... > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+  echo "ERROR: Backend tests failed. Commit blocked."
+  cd ..
+  exit 1
+fi
+cd ..
+
+echo "All checks passed."

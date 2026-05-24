@@ -1,328 +1,281 @@
-# Go-Chatsync
+# sync
 
-A real-time chat application built with Go and React, featuring private messaging and group chat functionality.
+![sync logo](sync_logo.png)
 
-## System Architecture
+A real-time communication platform built with **Go** (backend) and **Next.js** (frontend), featuring private messaging, group chat, JWT authentication, and WebSocket-based real-time synchronization.
 
-### Application Flow
-```mermaid
-graph TD
-    subgraph "Client Browser"
-        A[React App] --> B[WebSocket Connection]
-        A --> C[Static Files]
-    end
+![Login Page](screenshots/login-page.png)
 
-    subgraph "Go Server :8080"
-        D[HTTP Server] --> E[Static File Server]
-        D --> F[WebSocket Handler]
-        F --> G[Message Processor]
-        G --> H[Message Store]
-        G --> I[Client Manager]
-    end
+## Architecture
 
-    B <--> F
-    C <-- Served by --> E
+```
+┌─────────────────────┐      ┌──────────────────────────────┐
+│   Next.js Frontend  │      │       Go Backend (:8080)     │
+│                     │      │                              │
+│  ┌───────────────┐  │ HTTP │  ┌────────────────────────┐  │
+│  │  Auth Pages   │──┼──────┼─▶│  Chi Router (REST API) │  │
+│  │  (Login/Reg)  │  │      │  └─────────┬──────────────┘  │
+│  └───────────────┘  │      │            │                 │
+│  ┌───────────────┐  │      │  ┌─────────▼──────────────┐  │
+│  │  Chat Dashboard│  │      │  │  Auth Middleware       │  │
+│  │  (Messages)    │  │      │  └─────────┬──────────────┘  │
+│  └───────────────┘  │      │            │                 │
+│  ┌───────────────┐  │ WS   │  ┌─────────▼──────────────┐  │
+│  │ WebSocket     │──┼──────┼─▶│  WebSocket Hub         │  │
+│  │ Client        │  │      │  │  (Real-time Messaging) │  │
+│  └───────────────┘  │      │  └────────────────────────┘  │
+│                     │      │                              │
+│  Port: 3000         │      │  ┌────────────────────────┐  │
+└─────────────────────┘      │  │  PostgreSQL (sqlc)     │  │
+                              │  │  sync DB       │  │
+                              │  └────────────────────────┘  │
+                              │                              │
+                              │  ┌────────────────────────┐  │
+                              │  │  Swagger Docs          │  │
+                              │  │  /swagger/index.html   │  │
+                              │  └────────────────────────┘  │
+                              └──────────────────────────────┘
 ```
 
-### WebSocket Communication Flow
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Server
-    participant Store
+## Screenshots
 
-    Client->>Server: Connect WebSocket
-    Server->>Client: Connection Established
-    
-    Note over Client,Server: Private Message Flow
-    Client->>Server: Send Private Message
-    Server->>Store: Store Message
-    Server->>Client: Message Delivered
-    Server->>Client: Update Unread Count
-    
-    Note over Client,Server: Group Message Flow
-    Client->>Server: Send Group Message
-    Server->>Store: Store Message
-    Server->>Client: Message Delivered
-    Server->>Client: Update Unread Count
-    
-    Note over Client,Server: Chat Selection
-    Client->>Server: Select Chat
-    Server->>Store: Get Message History
-    Server->>Client: Send History
-    Client->>Server: Update Last Seen
-    Server->>Store: Update Timestamp
-```
+| Login Page | Register Page | Swagger API Docs |
+|:---:|:---:|:---:|
+| ![Login](screenshots/login-page.png) | ![Register](screenshots/register-page.png) | ![Swagger](screenshots/swagger-ui.png) |
 
-### Message Handling Flow
-```mermaid
-graph TD
-    A[WebSocket Message] --> B{Message Type}
-    B -->|Private Message| C[Process Private]
-    B -->|Group Message| D[Process Group]
-    B -->|System Message| E[Process System]
-    B -->|History Request| F[Process History]
-    
-    C --> G[Update Unread Count]
-    D --> G
-    E --> H[Broadcast Update]
-    F --> I[Send History]
-    
-    G --> J[Store Message]
-    H --> K[Update Clients]
-    I --> L[Send Messages]
-```
+## Demo
 
-### Server Architecture
-```mermaid
-graph TD
-    subgraph "Go Server :8080"
-        A[HTTP Server] --> B[Static File Server]
-        A --> C[WebSocket Handler]
-        
-        B --> D[React Build Files]
-        
-        C --> E[Message Router]
-        E --> F[Private Handler]
-        E --> G[Group Handler]
-        E --> H[System Handler]
-        
-        F --> I[Message Store]
-        G --> I
-        H --> I
-    end
+[![sync demo](sync_logo.png)](animate.mp4)
 
-    subgraph "Client"
-        J[Browser] --> K[React App]
-        K --> L[WebSocket Client]
-    end
-
-    L <--> C
-    J --> B
-```
+Click the image above or [watch the demo video](animate.mp4) to see sync in action.
 
 ## Features
 
-- Real-time messaging using WebSocket
-- Private messaging between users
-- Group chat functionality
-  - Create new groups
-  - Add/remove members
-  - Group-specific message history
-- Modern UI with Material-UI components
-- Responsive design
-- Message history persistence
-- User presence tracking
-- Unread message counts
-- Last seen timestamps
+- **Real-time messaging** via WebSocket with room-based broadcasting
+- **Private messaging** between users
+- **Group chat** with member management
+- **JWT authentication** with access and refresh tokens
+- **User presence** tracking (online/offline status)
+- **Typing indicators** and read receipts
+- **Cursor-based pagination** for message history
+- **RESTful API** with Swagger documentation
+- **Modern UI** with dark theme, glass morphism, and animations
 
-## Application Architecture
+## Tech Stack
 
-### Single Port Serving
-The application is served entirely from a single port (8080) using Go's built-in HTTP server:
+### Backend
+- **Language:** Go 1.23
+- **Router:** chi/v5
+- **Database:** PostgreSQL with pgx/v5
+- **Query Layer:** sqlc (type-safe SQL -> Go code generation)
+- **Auth:** golang-jwt/v5 + bcrypt
+- **WebSocket:** gorilla/websocket
+- **API Docs:** swaggo/swagger
 
-1. **Backend Server (Go)**:
-   - Serves the React application's static files
-   - Handles WebSocket connections
-   - Manages all API endpoints
-   - Port: 8080
-
-2. **Frontend (React)**:
-   - Built into static files
-   - Served by the Go backend
-   - Communicates with backend via WebSocket
-   - No separate development server needed in production
-
-### Development vs Production
-- **Development**:
-  - Frontend runs on port 3000 (React dev server)
-  - Backend runs on port 8080
-  - WebSocket connections to backend
-  - Hot reloading enabled
-
-- **Production**:
-  - Single port (8080) serving everything
-  - Optimized static files
-  - No development overhead
-  - Simplified deployment
-
-## WebSocket Implementation
-
-### Overview
-The application uses WebSocket for real-time bidirectional communication between the server and clients. This implementation ensures instant message delivery, efficient connection management, and robust error handling.
-
-### Connection Management
-- **Connection Establishment**: When a user connects to the application, their HTTP connection is upgraded to a WebSocket connection
-- **Client Registration**: Each connected client is registered with a unique username and maintained in an active clients map
-- **Connection Monitoring**: The server tracks all active connections and handles disconnections gracefully
-- **User Presence**: Real-time tracking of online/offline status for all users
-
-### Message Flow
-1. **Message Types**:
-   - Private Messages: One-to-one communication between users
-   - Group Messages: Communication within group channels
-   - System Messages: Server notifications and status updates
-   - History Requests: Retrieving message history
-   - Group Management: Creating and managing groups
-
-2. **Message Processing**:
-   - Messages are sent as JSON objects with type, content, and metadata
-   - Server validates and processes messages based on their type
-   - Messages are stored in memory for the current session
-   - Recipients receive messages in real-time if online
-
-3. **Message Delivery**:
-   - Private messages are delivered directly to the intended recipient
-   - Group messages are broadcast to all online group members
-   - System messages are sent to relevant users
-   - Message acknowledgments are sent back to the sender
-
-### Real-time Features
-1. **Instant Messaging**:
-   - Messages are delivered immediately to online users
-   - No polling or refresh required
-   - Efficient use of server resources
-
-2. **User Status Updates**:
-   - Real-time online/offline status
-   - Automatic status updates when users connect/disconnect
-   - Presence indicators in the UI
-
-3. **Group Management**:
-   - Real-time group creation and updates
-   - Instant member addition/removal notifications
-   - Live group member list updates
-
-### Error Handling
-- **Connection Errors**: Automatic handling of connection drops
-- **Message Errors**: Validation and error reporting for malformed messages
-- **Recovery**: Automatic reconnection attempts from the client
-- **Cleanup**: Proper resource cleanup on disconnection
-
-### Performance Considerations
-- **Efficient Communication**: WebSocket maintains a single persistent connection
-- **Resource Management**: Proper handling of connection resources
-- **Scalability**: Support for multiple concurrent connections
-- **Message Buffering**: Efficient message queuing and delivery
-
-### Security Features
-- **Connection Validation**: Secure WebSocket upgrade process
-- **Message Validation**: Input validation for all messages
-- **Error Isolation**: Errors in one connection don't affect others
-- **Resource Protection**: Prevention of resource exhaustion
+### Frontend
+- **Framework:** Next.js 16 (App Router)
+- **Language:** TypeScript 5
+- **Styling:** Tailwind CSS 4
+- **Animations:** Framer Motion 12
+- **Testing:** Vitest 4
 
 ## Project Structure
 
 ```
-.
-├── frontend/           # React application
-│   ├── src/           # Source code
-│   │   ├── components/    # React components
-│   │   ├── contexts/      # React contexts
-│   │   └── theme.js       # Material-UI theme
-│   ├── public/        # Static files
-│   ├── package.json   # Frontend dependencies
-│   └── README.md      # Frontend documentation
-├── backend/           # Go application
-│   ├── main.go       # Backend entry point
-│   ├── static/       # Static assets
-│   ├── scripts/      # Build scripts
-│   ├── go.mod        # Go module file
-│   └── go.sum        # Go module checksum
-└── run.sh            # Build and run script
+├── backend/                      # Go backend
+│   ├── cmd/server/main.go        # Entry point
+│   ├── internal/
+│   │   ├── auth/                 # Authentication (JWT, register, login)
+│   │   │   ├── handler.go        # HTTP handlers
+│   │   │   ├── service.go       # JWT token service
+│   │   │   └── types.go         # Request/response structs
+│   │   ├── config/               # Configuration
+│   │   ├── conversations/        # Conversation management
+│   │   │   ├── handler.go
+│   │   │   └── types.go
+│   │   ├── database/             # sqlc generated code + DB pool
+│   │   │   ├── models.go        # DB structs (sqlc generated)
+│   │   │   ├── pool.go          # Connection pool & migrations
+│   │   │   ├── querier.go       # Generated interface
+│   │   │   └── *.sql.go         # Generated query implementations
+│   │   ├── messages/            # Message handling
+│   │   │   ├── handler.go
+│   │   │   └── types.go
+│   │   ├── middleware/           # Auth middleware
+│   │   │   ├── auth.go
+│   │   │   └── types.go
+│   │   ├── users/               # User management
+│   │   │   ├── handler.go
+│   │   │   └── types.go
+│   │   └── websocket/           # WebSocket hub & client
+│   │       ├── client.go        # Client read/write pumps
+│   │       ├── handler.go       # WS upgrade handler
+│   │       ├── hub.go           # Hub methods
+│   │       └── types.go         # WS message & hub structs
+│   ├── sql/
+│   │   ├── schema/              # PostgreSQL migrations
+│   │   └── queries/             # SQL query files for sqlc
+│   ├── docs/
+│   │   ├── swagger/             # Generated swagger docs
+│   │   └── docs.go              # Swagger meta annotations
+│   ├── tests/                   # Backend tests (30+ tests)
+│   └── sqlc.yaml                # sqlc configuration
+├── frontend/                    # Next.js frontend
+│   ├── src/
+│   │   ├── app/                 # App Router pages
+│   │   │   ├── login/          # Login page
+│   │   │   ├── register/       # Register page
+│   │   │   └── chat/           # Chat dashboard
+│   │   ├── components/         # React components
+│   │   ├── contexts/           # Auth, WebSocket, SelectedConv
+│   │   └── lib/                # API client, WebSocket client
+│   ├── tests/                  # Frontend tests (11+ tests)
+│   └── package.json
+├── screenshots/                # Application screenshots
+├── run.sh                      # Backend build & run script
+└── sync                        # Compiled binary
 ```
 
 ## Getting Started
 
 ### Prerequisites
 
-- Go 1.16 or later
-- Node.js 14 or later
+- Go 1.23 or later
+- Node.js 18 or later
 - npm or yarn
+- PostgreSQL 16+
 
-### Installation
+### Database Setup
 
-1. Clone the repository:
+1. Ensure PostgreSQL is running on `localhost:5432`
+2. Create the database:
    ```bash
-   git clone https://github.com/CpBruceMeena/Go-Chatsync.git
-   cd Go-Chatsync
+   createdb -U postgres sync
    ```
+3. The application auto-applies migrations on startup
 
-2. Install frontend dependencies:
-   ```bash
-   cd frontend
-   npm install
-   ```
+### Backend
 
-3. Install backend dependencies:
-   ```bash
-   cd ../backend
-   go mod download
-   ```
+```bash
+# Start the backend server (auto-migrates DB)
+cd backend
+go run ./cmd/server
+```
 
-### Running the Application
+The backend starts on `http://localhost:8080` with:
+- **REST API:** `http://localhost:8080`
+- **WebSocket:** `ws://localhost:8080/ws`
+- **Swagger Docs:** `http://localhost:8080/swagger/index.html`
 
-1. Start the application using the provided script:
-   ```bash
-   ./run.sh
-   ```
+### Frontend
 
-   This will:
-   - Build the frontend
-   - Start the backend server
-   - Serve the application at http://localhost:8080
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-## Features in Detail
+The frontend starts on `http://localhost:3000`.
 
-### Private Messaging
-- One-to-one chat between users
-- Real-time message delivery
-- Message history persistence
-- Online/offline status indicators
+### Running Tests
 
-### Group Chat
-- Create new groups with custom names
-- Add or remove members from groups
-- Group-specific message history
-- Member count display
-- Group visibility limited to members only
+```bash
+# Backend tests (30+ tests)
+cd backend && go test ./tests/... -v
 
-### User Interface
-- Clean and modern Material-UI design
-- Responsive layout
-- Intuitive navigation
-- Real-time updates
-- Message timestamps
-- User presence indicators
+# Frontend tests (11+ tests)
+cd frontend && npm test
+```
 
-## Recent Updates
+## API Documentation
 
-### Unread Message Counts
-- Real-time unread message tracking
-- Badge indicators for unread messages
-- Automatic count reset when opening chats
-- Persistence across sessions
+Full interactive API documentation is available at `/swagger/index.html` when the backend is running.
 
-### Last Seen Timestamps
-- Tracks when users last viewed chats
-- Updates automatically when opening chats
-- Used for unread message calculations
-- Real-time synchronization
+### Endpoints
 
-### Message Handling Improvements
-- Optimized message state management
-- Better error handling
-- Improved WebSocket message flow
-- Enhanced real-time updates
+#### Authentication (Public)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/register` | Create a new account |
+| POST | `/api/auth/login` | Login with credentials |
+| POST | `/api/auth/refresh` | Refresh access token |
 
-## Contributing
+#### Authentication (Protected)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/logout` | Logout and invalidate sessions |
+| GET | `/api/auth/me` | Get current user profile |
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+#### Users
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/users` | List all users |
+| GET | `/api/users/{id}` | Get user by ID |
+| PUT | `/api/users/me` | Update own profile |
+
+#### Conversations
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/conversations` | List user conversations |
+| POST | `/api/conversations` | Create conversation |
+| GET | `/api/conversations/{id}` | Get conversation details |
+| POST | `/api/conversations/{id}/members` | Add member |
+| DELETE | `/api/conversations/{id}/members/{userId}` | Remove member |
+
+#### Messages
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/conversations/{id}/messages` | List messages (paginated) |
+| POST | `/api/conversations/{id}/messages` | Send message |
+| DELETE | `/api/messages/{id}` | Delete message |
+
+### WebSocket Events
+
+Connect via `ws://localhost:8080/ws?token={jwt_token}`
+
+| Event Type | Direction | Description |
+|-----------|-----------|-------------|
+| `new_message` | Server→Client | New message in conversation |
+| `typing` | Client↔Server | User is typing |
+| `stop_typing` | Client↔Server | User stopped typing |
+| `read_receipt` | Client↔Server | Message read acknowledgement |
+| `presence` | Server→Client | User presence update |
+| `online_users` | Server→Client | List of online user IDs |
+
+## Design Decisions
+
+### Struct/Function Separation
+- Application structs (request/response types) are kept in `types.go` files
+- Handler functions and business logic are in `handler.go` files
+- Database structs (sqlc generated) remain in `internal/database/models.go`
+- DB models are never mixed with application-level response structs
+
+### Database Layer
+- SQL queries defined in `sql/queries/` as raw SQL
+- `sqlc` generates type-safe Go code from queries
+- Migrations use `IF NOT EXISTS` for idempotent replay
+- Connection pooling via pgx/v5 with 25 max connections
+
+### Testing
+- Backend: Go standard `testing` package with table-driven tests
+- Mocked DB layer via `database.Querier` interface
+- Frontend: Vitest with jsdom for component testing
+
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DB_HOST` | localhost | PostgreSQL host |
+| `DB_PORT` | 5432 | PostgreSQL port |
+| `DB_USER` | postgres | Database user |
+| `DB_PASSWORD` | password | Database password |
+| `DB_NAME` | sync | Database name |
+| `DB_SSLMODE` | disable | SSL mode |
+| `SERVER_PORT` | 8080 | Backend server port |
+| `JWT_SECRET` | super-secret-key-change-in-production | JWT signing key |
+| `JWT_ACCESS_TTL` | 15 | Access token TTL (minutes) |
+| `JWT_REFRESH_TTL` | 7 | Refresh token TTL (days) |
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+MIT
