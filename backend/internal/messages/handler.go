@@ -6,12 +6,14 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/CpBruceMeena/sync/internal/database"
+	"github.com/CpBruceMeena/sync/internal/models"
+	"github.com/CpBruceMeena/sync/internal/repository"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
-func NewHandler(queries database.Querier) *Handler {
-	return &Handler{queries: queries}
+func NewHandler(repos *repository.Repositories) *Handler {
+	return &Handler{repos: repos}
 }
 
 // ListMessages returns messages for a conversation with cursor-based pagination
@@ -29,7 +31,7 @@ func NewHandler(queries database.Querier) *Handler {
 // @Failure 500 {object} map[string]string
 // @Router /api/conversations/{id}/messages [get]
 func (h *Handler) ListMessages(w http.ResponseWriter, r *http.Request) {
-	convIDStr := r.PathValue("id")
+	convIDStr := chi.URLParam(r, "id")
 	convID, err := uuid.Parse(convIDStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid conversation ID")
@@ -53,18 +55,43 @@ func (h *Handler) ListMessages(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	messages, err := h.queries.ListMessagesByConversation(r.Context(), database.ListMessagesByConversationParams{
-		ConversationID: convID,
-		Column2:        cursor,
-		Limit:          int32(limit),
-	})
+	messages, err := h.repos.Messages.ListByConversation(r.Context(), convID, cursor, limit)
 	if err != nil {
 		log.Printf("Error listing messages: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to list messages")
 		return
 	}
 
-	respondJSON(w, http.StatusOK, messages)
+	// Build response with sender usernames
+	type MessageResponse struct {
+		ID             uuid.UUID `json:"id"`
+		ConversationID uuid.UUID `json:"conversation_id"`
+		SenderID       uuid.UUID `json:"sender_id"`
+		SenderUsername string    `json:"sender_username"`
+		Content        string    `json:"content"`
+		Type           string    `json:"type"`
+		CreatedAt      string    `json:"created_at"`
+	}
+
+	response := make([]MessageResponse, 0, len(messages))
+	for _, msg := range messages {
+		sender, err := h.repos.Users.GetByID(r.Context(), msg.SenderID)
+		senderUsername := ""
+		if err == nil && sender != nil {
+			senderUsername = sender.Username
+		}
+		response = append(response, MessageResponse{
+			ID:             msg.ID,
+			ConversationID: msg.ConversationID,
+			SenderID:       msg.SenderID,
+			SenderUsername: senderUsername,
+			Content:        msg.Content,
+			Type:           msg.Type,
+			CreatedAt:      msg.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		})
+	}
+
+	respondJSON(w, http.StatusOK, response)
 }
 
 // SendMessage sends a new message to a conversation
@@ -82,7 +109,7 @@ func (h *Handler) ListMessages(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	senderID := r.Context().Value("user_id").(uuid.UUID)
 
-	convIDStr := r.PathValue("id")
+	convIDStr := chi.URLParam(r, "id")
 	convID, err := uuid.Parse(convIDStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid conversation ID")
@@ -108,13 +135,13 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		msgType = "text"
 	}
 
-	msg, err := h.queries.CreateMessage(r.Context(), database.CreateMessageParams{
+	msg := &models.Message{
 		ConversationID: convID,
 		SenderID:       senderID,
 		Content:        req.Content,
 		Type:           msgType,
-	})
-	if err != nil {
+	}
+	if err := h.repos.Messages.Create(r.Context(), msg); err != nil {
 		log.Printf("Error creating message: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to send message")
 		return
@@ -138,17 +165,14 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(uuid.UUID)
 
-	msgIDStr := r.PathValue("id")
+	msgIDStr := chi.URLParam(r, "id")
 	msgID, err := uuid.Parse(msgIDStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid message ID")
 		return
 	}
 
-	if err := h.queries.DeleteMessage(r.Context(), database.DeleteMessageParams{
-		ID:       msgID,
-		SenderID: userID,
-	}); err != nil {
+	if err := h.repos.Messages.Delete(r.Context(), msgID, userID); err != nil {
 		log.Printf("Error deleting message: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to delete message")
 		return

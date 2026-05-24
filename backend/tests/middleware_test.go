@@ -28,7 +28,7 @@ func TestAuthMiddleware_ValidToken(t *testing.T) {
 	svc, token, userID := setupAuthMiddlewareTest(t)
 
 	handler := middleware.AuthMiddleware(svc)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		gotID := r.Context().Value(middleware.UserIDKey).(uuid.UUID)
+		gotID := r.Context().Value("user_id").(uuid.UUID)
 		if gotID != userID {
 			t.Errorf("Expected userID %v, got %v", userID, gotID)
 		}

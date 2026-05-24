@@ -1,13 +1,13 @@
 package users
 
 import (
-	"github.com/CpBruceMeena/sync/internal/database"
+	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/google/uuid"
 )
 
 // Handler handles user HTTP requests
 type Handler struct {
-	queries database.Querier
+	repos *repository.Repositories
 }
 
 // UserResponse represents a user in API responses

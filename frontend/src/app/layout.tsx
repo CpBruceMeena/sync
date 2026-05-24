@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   icons: {
-    icon: "/logo.png",
-    apple: "/logo.png",
+    icon: "/sync_logo.png",
+    apple: "/sync_logo.png",
   },
   title: "sync - Stay Connected, Stay in Sync",
   description:

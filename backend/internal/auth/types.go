@@ -1,15 +1,14 @@
 package auth
 
 import (
-	"github.com/CpBruceMeena/sync/internal/database"
+	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/google/uuid"
 )
 
 // Handler handles authentication HTTP requests
 type Handler struct {
 	authService *Service
-	db          *database.DB
-	queries     database.Querier
+	repos       *repository.Repositories
 }
 
 // RegisterRequest represents a registration request body

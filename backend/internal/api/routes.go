@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+
 	"github.com/CpBruceMeena/sync/internal/auth"
 	"github.com/CpBruceMeena/sync/internal/conversations"
 	"github.com/CpBruceMeena/sync/internal/messages"
@@ -33,7 +34,7 @@ func SetupRoutes(
 	r.Use(chimw.Recoverer)
 	r.Use(chimw.RequestID)
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins:   []string{"http://localhost:3000", "http://127.0.0.1:3000"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Request-ID"},
 		ExposedHeaders:   []string{"Link"},

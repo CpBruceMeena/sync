@@ -1,8 +1,10 @@
 package messages
 
-import "github.com/CpBruceMeena/sync/internal/database"
+import (
+	"github.com/CpBruceMeena/sync/internal/repository"
+)
 
 // Handler handles message HTTP requests
 type Handler struct {
-	queries database.Querier
+	repos *repository.Repositories
 }

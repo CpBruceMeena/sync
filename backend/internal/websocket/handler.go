@@ -1,18 +1,19 @@
 package websocket
 
 import (
+	"context"
 	"log"
 	"net/http"
 
 	"github.com/CpBruceMeena/sync/internal/auth"
-	"github.com/CpBruceMeena/sync/internal/database"
+	"github.com/CpBruceMeena/sync/internal/repository"
 )
 
-func NewWsHandler(hub *Hub, authService *auth.Service, queries database.Querier) *WsHandler {
+func NewWsHandler(hub *Hub, authService *auth.Service, repos *repository.Repositories) *WsHandler {
 	return &WsHandler{
 		hub:         hub,
 		authService: authService,
-		queries:     queries,
+		repos:       repos,
 	}
 }
 
@@ -55,7 +56,7 @@ func (h *WsHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WsHandler) subscribeToConversations(client *Client) {
-	convs, err := h.queries.ListUserConversations(nil, client.UserID)
+	convs, err := h.repos.Conversations.ListByUserID(context.Background(), client.UserID)
 	if err != nil {
 		log.Printf("Error fetching conversations for user %s: %v", client.Username, err)
 		return

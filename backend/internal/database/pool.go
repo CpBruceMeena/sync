@@ -1,76 +1,56 @@
 package database
 
 import (
-	"context"
 	"fmt"
 	"log"
-	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type DB struct {
-	Pool    *pgxpool.Pool
-	Queries *Queries
+	DB *gorm.DB
 }
 
-func NewDB(ctx context.Context, dsn string) (*DB, error) {
-	config, err := pgxpool.ParseConfig(dsn)
-	if err != nil {
-		return nil, fmt.Errorf("parse pool config: %w", err)
+func NewDB(dsn string) (*DB, error) {
+	config := &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Warn),
 	}
 
-	config.MaxConns = 25
-
-	pool, err := pgxpool.NewWithConfig(ctx, config)
+	db, err := gorm.Open(postgres.Open(dsn), config)
 	if err != nil {
-		return nil, fmt.Errorf("create connection pool: %w", err)
+		return nil, fmt.Errorf("connect to database: %w", err)
 	}
 
-	if err := pool.Ping(ctx); err != nil {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("get underlying sql db: %w", err)
+	}
+
+	sqlDB.SetMaxOpenConns(25)
+
+	if err := sqlDB.Ping(); err != nil {
 		return nil, fmt.Errorf("ping database: %w", err)
 	}
 
 	log.Println("Connected to PostgreSQL database")
-	return &DB{
-		Pool:    pool,
-		Queries: New(pool),
-	}, nil
+	return &DB{DB: db}, nil
 }
 
 func (db *DB) Close() {
-	db.Pool.Close()
+	sqlDB, err := db.DB.DB()
+	if err != nil {
+		log.Printf("Error getting underlying sql db: %v", err)
+		return
+	}
+	sqlDB.Close()
 }
 
-func (db *DB) RunMigrations(ctx context.Context, schemaDir string) error {
-	entries, err := os.ReadDir(schemaDir)
-	if err != nil {
-		return fmt.Errorf("read schema directory: %w", err)
+func (db *DB) RunMigrations(dbInstance *gorm.DB) error {
+	if err := dbInstance.AutoMigrate(); err != nil {
+		return fmt.Errorf("auto migrate: %w", err)
 	}
-
-	var files []string
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".sql") {
-			files = append(files, entry.Name())
-		}
-	}
-	sort.Strings(files)
-
-	for _, file := range files {
-		path := filepath.Join(schemaDir, file)
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return fmt.Errorf("read schema file %s: %w", file, err)
-		}
-
-		if _, err := db.Pool.Exec(ctx, string(content)); err != nil {
-			return fmt.Errorf("execute schema %s: %w", file, err)
-		}
-		log.Printf("Applied migration: %s", file)
-	}
-
+	log.Println("Database migrations applied")
 	return nil
 }

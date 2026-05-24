@@ -26,7 +26,7 @@ A real-time communication platform built with **Go** (backend) and **Next.js** (
 │  └───────────────┘  │      │  └────────────────────────┘  │
 │                     │      │                              │
 │  Port: 3000         │      │  ┌────────────────────────┐  │
-└─────────────────────┘      │  │  PostgreSQL (sqlc)     │  │
+└─────────────────────┘      │  │  PostgreSQL (GORM)     │  │
                               │  │  sync DB       │  │
                               │  └────────────────────────┘  │
                               │                              │
@@ -37,17 +37,9 @@ A real-time communication platform built with **Go** (backend) and **Next.js** (
                               └──────────────────────────────┘
 ```
 
-## Screenshots
-
-| Login Page | Register Page | Swagger API Docs |
-|:---:|:---:|:---:|
-| ![Login](screenshots/login-page.png) | ![Register](screenshots/register-page.png) | ![Swagger](screenshots/swagger-ui.png) |
-
 ## Demo
 
-[![sync demo](sync_logo.png)](animate.mp4)
-
-Click the image above or [watch the demo video](animate.mp4) to see sync in action.
+> Screenshots coming soon — showing the updated sync UI.
 
 ## Features
 
@@ -66,8 +58,8 @@ Click the image above or [watch the demo video](animate.mp4) to see sync in acti
 ### Backend
 - **Language:** Go 1.23
 - **Router:** chi/v5
-- **Database:** PostgreSQL with pgx/v5
-- **Query Layer:** sqlc (type-safe SQL -> Go code generation)
+- **Database:** PostgreSQL with GORM
+- **ORM:** GORM (AutoMigrate + Repository pattern)
 - **Auth:** golang-jwt/v5 + bcrypt
 - **WebSocket:** gorilla/websocket
 - **API Docs:** swaggo/swagger
@@ -93,11 +85,21 @@ Click the image above or [watch the demo video](animate.mp4) to see sync in acti
 │   │   ├── conversations/        # Conversation management
 │   │   │   ├── handler.go
 │   │   │   └── types.go
-│   │   ├── database/             # sqlc generated code + DB pool
-│   │   │   ├── models.go        # DB structs (sqlc generated)
-│   │   │   ├── pool.go          # Connection pool & migrations
-│   │   │   ├── querier.go       # Generated interface
-│   │   │   └── *.sql.go         # Generated query implementations
+│   │   ├── database/             # Database connection & pooling
+│   │   │   └── pool.go          # GORM connection pool & AutoMigrate
+│   │   ├── models/               # GORM model definitions
+│   │   │   ├── user.go
+│   │   │   ├── conversation.go
+│   │   │   ├── message.go
+│   │   │   ├── notification.go
+│   │   │   └── session.go
+│   │   ├── repository/           # Repository pattern interfaces
+│   │   │   ├── repositories.go  # Combined Repositories struct
+│   │   │   ├── user_repo.go
+│   │   │   ├── conversation_repo.go
+│   │   │   ├── message_repo.go
+│   │   │   ├── notification_repo.go
+│   │   │   └── session_repo.go
 │   │   ├── messages/            # Message handling
 │   │   │   ├── handler.go
 │   │   │   └── types.go
@@ -112,14 +114,10 @@ Click the image above or [watch the demo video](animate.mp4) to see sync in acti
 │   │       ├── handler.go       # WS upgrade handler
 │   │       ├── hub.go           # Hub methods
 │   │       └── types.go         # WS message & hub structs
-│   ├── sql/
-│   │   ├── schema/              # PostgreSQL migrations
-│   │   └── queries/             # SQL query files for sqlc
 │   ├── docs/
 │   │   ├── swagger/             # Generated swagger docs
 │   │   └── docs.go              # Swagger meta annotations
 │   ├── tests/                   # Backend tests (30+ tests)
-│   └── sqlc.yaml                # sqlc configuration
 ├── frontend/                    # Next.js frontend
 │   ├── src/
 │   │   ├── app/                 # App Router pages
@@ -133,7 +131,6 @@ Click the image above or [watch the demo video](animate.mp4) to see sync in acti
 │   └── package.json
 ├── screenshots/                # Application screenshots
 ├── run.sh                      # Backend build & run script
-└── sync                        # Compiled binary
 ```
 
 ## Getting Started
@@ -143,7 +140,33 @@ Click the image above or [watch the demo video](animate.mp4) to see sync in acti
 - Go 1.23 or later
 - Node.js 18 or later
 - npm or yarn
-- PostgreSQL 16+
+- PostgreSQL 16+ *(optional — use Docker Compose instead)*
+- Docker & Docker Compose *(recommended for easy setup)*
+
+### Docker (Recommended)
+
+The fastest way to run the full stack:
+
+```bash
+# Start all services (PostgreSQL + backend + frontend)
+docker compose up -d
+
+# View logs
+docker compose logs -f
+
+# Stop everything
+docker compose down
+```
+
+Services:
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:8080 |
+| Swagger Docs | http://localhost:8080/swagger/index.html |
+| WebSocket | ws://localhost:8080/ws |
+
+### Manual Setup
 
 ### Database Setup
 
@@ -185,6 +208,9 @@ cd backend && go test ./tests/... -v
 
 # Frontend tests (11+ tests)
 cd frontend && npm test
+
+# Backend tests via Docker Compose (starts fresh PostgreSQL)
+docker compose run --rm test
 ```
 
 ## API Documentation
@@ -247,19 +273,21 @@ Connect via `ws://localhost:8080/ws?token={jwt_token}`
 ### Struct/Function Separation
 - Application structs (request/response types) are kept in `types.go` files
 - Handler functions and business logic are in `handler.go` files
-- Database structs (sqlc generated) remain in `internal/database/models.go`
+- GORM model definitions are in `internal/models/`
 - DB models are never mixed with application-level response structs
 
 ### Database Layer
-- SQL queries defined in `sql/queries/` as raw SQL
-- `sqlc` generates type-safe Go code from queries
-- Migrations use `IF NOT EXISTS` for idempotent replay
-- Connection pooling via pgx/v5 with 25 max connections
+- GORM handles schema migrations via `AutoMigrate()`
+- Repository pattern abstracts database operations behind interfaces
+- Connection pooling via GORM with 25 max connections
+- All models use UUID primary keys with `gen_random_uuid()` default
 
 ### Testing
 - Backend: Go standard `testing` package with table-driven tests
-- Mocked DB layer via `database.Querier` interface
+- Repository interfaces are mocked for unit tests
+- Backend E2E: testcontainers-go for disposable PostgreSQL (or manual `TEST_DATABASE_URL`)
 - Frontend: Vitest with jsdom for component testing
+- Full-stack E2E: Playwright for browser-level testing
 
 ## Environment Variables
 
