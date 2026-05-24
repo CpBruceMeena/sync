@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/CpBruceMeena/sync/internal/database"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -174,7 +175,7 @@ func (h *Handler) CreateConversation(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} map[string]string
 // @Router /api/conversations/{id}/members [post]
 func (h *Handler) AddMember(w http.ResponseWriter, r *http.Request) {
-	convIDStr := r.PathValue("id")
+	convIDStr := chi.URLParam(r, "id")
 	convID, err := uuid.Parse(convIDStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid conversation ID")
@@ -223,14 +224,14 @@ func (h *Handler) AddMember(w http.ResponseWriter, r *http.Request) {
 // @Failure 500 {object} map[string]string
 // @Router /api/conversations/{id}/members/{userId} [delete]
 func (h *Handler) RemoveMember(w http.ResponseWriter, r *http.Request) {
-	convIDStr := r.PathValue("id")
+	convIDStr := chi.URLParam(r, "id")
 	convID, err := uuid.Parse(convIDStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
-	memberIDStr := r.PathValue("userId")
+	memberIDStr := chi.URLParam(r, "userId")
 	memberID, err := uuid.Parse(memberIDStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid member ID")
@@ -262,7 +263,7 @@ func (h *Handler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {object} map[string]string
 // @Router /api/conversations/{id} [get]
 func (h *Handler) GetConversation(w http.ResponseWriter, r *http.Request) {
-	convIDStr := r.PathValue("id")
+	convIDStr := chi.URLParam(r, "id")
 	convID, err := uuid.Parse(convIDStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid conversation ID")

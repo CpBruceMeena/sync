@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/CpBruceMeena/sync/internal/database"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
@@ -59,7 +60,7 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 // @Failure 404 {object} map[string]string
 // @Router /api/users/{id} [get]
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
-	userIDStr := r.PathValue("id")
+	userIDStr := chi.URLParam(r, "id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid user ID")

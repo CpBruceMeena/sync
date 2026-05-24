@@ -33,7 +33,10 @@ SELECT c.id, c.type, c.name, c.admin_id, c.created_at, c.updated_at,
 FROM conversations c
 JOIN conversation_members cm ON cm.conversation_id = c.id
 WHERE cm.user_id = $1
-ORDER BY COALESCE(last_message_at, c.created_at) DESC;
+ORDER BY COALESCE(
+  (SELECT m.created_at FROM messages m WHERE m.conversation_id = c.id ORDER BY m.created_at DESC LIMIT 1),
+  c.created_at
+) DESC;
 
 -- name: AddConversationMember :one
 INSERT INTO conversation_members (conversation_id, user_id, role)

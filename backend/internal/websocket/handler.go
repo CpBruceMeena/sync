@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"context"
 	"log"
 	"net/http"
 
@@ -55,7 +56,7 @@ func (h *WsHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WsHandler) subscribeToConversations(client *Client) {
-	convs, err := h.queries.ListUserConversations(nil, client.UserID)
+	convs, err := h.queries.ListUserConversations(context.Background(), client.UserID)
 	if err != nil {
 		log.Printf("Error fetching conversations for user %s: %v", client.Username, err)
 		return

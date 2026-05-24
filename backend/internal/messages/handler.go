@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/CpBruceMeena/sync/internal/database"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
@@ -29,7 +30,7 @@ func NewHandler(queries database.Querier) *Handler {
 // @Failure 500 {object} map[string]string
 // @Router /api/conversations/{id}/messages [get]
 func (h *Handler) ListMessages(w http.ResponseWriter, r *http.Request) {
-	convIDStr := r.PathValue("id")
+	convIDStr := chi.URLParam(r, "id")
 	convID, err := uuid.Parse(convIDStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid conversation ID")
@@ -82,7 +83,7 @@ func (h *Handler) ListMessages(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	senderID := r.Context().Value("user_id").(uuid.UUID)
 
-	convIDStr := r.PathValue("id")
+	convIDStr := chi.URLParam(r, "id")
 	convID, err := uuid.Parse(convIDStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid conversation ID")
@@ -138,7 +139,7 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) DeleteMessage(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(uuid.UUID)
 
-	msgIDStr := r.PathValue("id")
+	msgIDStr := chi.URLParam(r, "id")
 	msgID, err := uuid.Parse(msgIDStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid message ID")

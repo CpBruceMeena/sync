@@ -51,6 +51,7 @@ debug.test
 # Go specific
 backend/vendor/
 backend/sync
+server
 
 # Node specific
 frontend/node_modules/
