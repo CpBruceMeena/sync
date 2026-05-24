@@ -5,13 +5,13 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/CpBruceMeena/sync/internal/database"
+	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
-func NewHandler(queries database.Querier) *Handler {
-	return &Handler{queries: queries}
+func NewHandler(repos *repository.Repositories) *Handler {
+	return &Handler{repos: repos}
 }
 
 // ListUsers returns all registered users
@@ -25,7 +25,7 @@ func NewHandler(queries database.Querier) *Handler {
 // @Failure 500 {object} map[string]string
 // @Router /api/users [get]
 func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := h.queries.ListUsers(r.Context())
+	users, err := h.repos.Users.List(r.Context())
 	if err != nil {
 		log.Printf("Error listing users: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to list users")
@@ -67,7 +67,7 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.queries.GetUserByID(r.Context(), userID)
+	user, err := h.repos.Users.GetByID(r.Context(), userID)
 	if err != nil {
 		respondError(w, http.StatusNotFound, "User not found")
 		return
@@ -107,13 +107,22 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.queries.UpdateUser(r.Context(), database.UpdateUserParams{
-		ID:          userID,
-		DisplayName: req.DisplayName,
-		AvatarUrl:   req.AvatarURL,
-		Status:      req.Status,
-	})
+	user, err := h.repos.Users.GetByID(r.Context(), userID)
 	if err != nil {
+		respondError(w, http.StatusNotFound, "User not found")
+		return
+	}
+
+	if req.DisplayName != "" {
+		user.DisplayName = req.DisplayName
+	}
+	if req.AvatarURL != "" {
+		user.AvatarUrl = req.AvatarURL
+	}
+	if req.Status != "" {
+		user.Status = req.Status
+	}
+	if err := h.repos.Users.Update(r.Context(), user); err != nil {
 		log.Printf("Error updating user: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to update profile")
 		return

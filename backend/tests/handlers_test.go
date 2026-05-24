@@ -10,131 +10,296 @@ import (
 
 	"github.com/CpBruceMeena/sync/internal/auth"
 	"github.com/CpBruceMeena/sync/internal/conversations"
-	"github.com/CpBruceMeena/sync/internal/database"
 	"github.com/CpBruceMeena/sync/internal/messages"
+	"github.com/CpBruceMeena/sync/internal/models"
+	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/CpBruceMeena/sync/internal/users"
 	"github.com/google/uuid"
 )
 
-// mockQueries implements database.Querier interface for testing
-type mockQueries struct {
-	usersFn          func() ([]database.ListUsersRow, error)
-	getUserByIDFn    func(id uuid.UUID) (database.GetUserByIDRow, error)
-	getUserByEmailFn func(email string) (database.GetUserByEmailRow, error)
-	createUserFn     func(params database.CreateUserParams) (database.CreateUserRow, error)
+// ---- Mock repository implementations ----
+
+type mockUserRepo struct {
+	getByEmailFn             func(ctx context.Context, email string) (*models.User, error)
+	getByUsernameFn          func(ctx context.Context, username string) (*models.User, error)
+	listFn                   func(ctx context.Context) ([]models.User, error)
+	createFn                 func(ctx context.Context, user *models.User) error
+	getByIDFn                func(ctx context.Context, id uuid.UUID) (*models.User, error)
+	getByEmailWithPasswordFn func(ctx context.Context, email string) (*models.User, error)
+	updateFn                 func(ctx context.Context, user *models.User) error
+	updatePasswordFn         func(ctx context.Context, id uuid.UUID, passwordHash string) error
+	updateStatusFn           func(ctx context.Context, id uuid.UUID, status string) error
+	deleteFn                 func(ctx context.Context, id uuid.UUID) error
 }
 
-func (m *mockQueries) AddConversationMember(ctx context.Context, arg database.AddConversationMemberParams) (uuid.UUID, error) {
-	return uuid.New(), nil
-}
-func (m *mockQueries) AddReaction(ctx context.Context, arg database.AddReactionParams) (uuid.UUID, error) {
-	return uuid.New(), nil
-}
-func (m *mockQueries) CleanExpiredSessions(ctx context.Context) error { return nil }
-func (m *mockQueries) CreateConversation(ctx context.Context, arg database.CreateConversationParams) (database.Conversation, error) {
-	return database.Conversation{ID: uuid.New(), Type: arg.Type, Name: arg.Name, AdminID: arg.AdminID}, nil
-}
-func (m *mockQueries) CreateMessage(ctx context.Context, arg database.CreateMessageParams) (database.Message, error) {
-	return database.Message{ID: uuid.New(), ConversationID: arg.ConversationID, SenderID: arg.SenderID, Content: arg.Content, Type: arg.Type}, nil
-}
-func (m *mockQueries) CreateNotification(ctx context.Context, arg database.CreateNotificationParams) (database.Notification, error) {
-	return database.Notification{}, nil
-}
-func (m *mockQueries) CreateSession(ctx context.Context, arg database.CreateSessionParams) (database.Session, error) {
-	return database.Session{ID: uuid.New(), UserID: arg.UserID, RefreshToken: arg.RefreshToken, ExpiresAt: arg.ExpiresAt}, nil
-}
-func (m *mockQueries) CreateUser(ctx context.Context, arg database.CreateUserParams) (database.CreateUserRow, error) {
-	if m.createUserFn != nil {
-		return m.createUserFn(arg)
+func (m *mockUserRepo) Create(ctx context.Context, user *models.User) error {
+	if m.createFn != nil {
+		return m.createFn(ctx, user)
 	}
-	return database.CreateUserRow{}, nil
-}
-func (m *mockQueries) DeleteConversation(ctx context.Context, id uuid.UUID) error { return nil }
-func (m *mockQueries) DeleteMessage(ctx context.Context, arg database.DeleteMessageParams) error {
 	return nil
 }
-func (m *mockQueries) DeleteNotification(ctx context.Context, arg database.DeleteNotificationParams) error {
-	return nil
-}
-func (m *mockQueries) DeleteSession(ctx context.Context, id uuid.UUID) error { return nil }
-func (m *mockQueries) DeleteUser(ctx context.Context, id uuid.UUID) error    { return nil }
-func (m *mockQueries) DeleteUserSessions(ctx context.Context, userID uuid.UUID) error {
-	return nil
-}
-func (m *mockQueries) FindPrivateConversation(ctx context.Context, arg database.FindPrivateConversationParams) (database.Conversation, error) {
-	return database.Conversation{}, nil
-}
-func (m *mockQueries) GetConversationByID(ctx context.Context, id uuid.UUID) (database.GetConversationByIDRow, error) {
-	return database.GetConversationByIDRow{}, nil
-}
-func (m *mockQueries) GetConversationMembers(ctx context.Context, conversationID uuid.UUID) ([]database.GetConversationMembersRow, error) {
+func (m *mockUserRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
+	if m.getByIDFn != nil {
+		return m.getByIDFn(ctx, id)
+	}
 	return nil, nil
 }
-func (m *mockQueries) GetMessageByID(ctx context.Context, id uuid.UUID) (database.GetMessageByIDRow, error) {
-	return database.GetMessageByIDRow{}, nil
-}
-func (m *mockQueries) GetSessionByToken(ctx context.Context, refreshToken string) (database.GetSessionByTokenRow, error) {
-	return database.GetSessionByTokenRow{}, nil
-}
-func (m *mockQueries) GetUnreadNotificationCount(ctx context.Context, userID uuid.UUID) (int64, error) {
-	return 0, nil
-}
-func (m *mockQueries) GetUserByEmail(ctx context.Context, email string) (database.GetUserByEmailRow, error) {
-	if m.getUserByEmailFn != nil {
-		return m.getUserByEmailFn(email)
+func (m *mockUserRepo) GetByEmail(ctx context.Context, email string) (*models.User, error) {
+	if m.getByEmailFn != nil {
+		return m.getByEmailFn(ctx, email)
 	}
-	return database.GetUserByEmailRow{}, nil
+	return nil, nil
 }
-func (m *mockQueries) GetUserByEmailWithPassword(ctx context.Context, email string) (database.User, error) {
-	return database.User{}, nil
-}
-func (m *mockQueries) GetUserByID(ctx context.Context, id uuid.UUID) (database.GetUserByIDRow, error) {
-	if m.getUserByIDFn != nil {
-		return m.getUserByIDFn(id)
+func (m *mockUserRepo) GetByEmailWithPassword(ctx context.Context, email string) (*models.User, error) {
+	if m.getByEmailWithPasswordFn != nil {
+		return m.getByEmailWithPasswordFn(ctx, email)
 	}
-	return database.GetUserByIDRow{}, nil
+	return nil, nil
 }
-func (m *mockQueries) GetUserByUsername(ctx context.Context, username string) (database.GetUserByUsernameRow, error) {
-	return database.GetUserByUsernameRow{}, nil
+func (m *mockUserRepo) GetByUsername(ctx context.Context, username string) (*models.User, error) {
+	if m.getByUsernameFn != nil {
+		return m.getByUsernameFn(ctx, username)
+	}
+	return nil, nil
 }
-func (m *mockQueries) IsConversationMember(ctx context.Context, arg database.IsConversationMemberParams) (bool, error) {
+func (m *mockUserRepo) List(ctx context.Context) ([]models.User, error) {
+	if m.listFn != nil {
+		return m.listFn(ctx)
+	}
+	return nil, nil
+}
+func (m *mockUserRepo) Update(ctx context.Context, user *models.User) error {
+	if m.updateFn != nil {
+		return m.updateFn(ctx, user)
+	}
+	return nil
+}
+func (m *mockUserRepo) UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error {
+	if m.updatePasswordFn != nil {
+		return m.updatePasswordFn(ctx, id, passwordHash)
+	}
+	return nil
+}
+func (m *mockUserRepo) UpdateStatus(ctx context.Context, id uuid.UUID, status string) error {
+	if m.updateStatusFn != nil {
+		return m.updateStatusFn(ctx, id, status)
+	}
+	return nil
+}
+func (m *mockUserRepo) Delete(ctx context.Context, id uuid.UUID) error {
+	if m.deleteFn != nil {
+		return m.deleteFn(ctx, id)
+	}
+	return nil
+}
+
+type mockConvRepo struct {
+	createFn       func(ctx context.Context, conv *models.Conversation) error
+	getByIDFn      func(ctx context.Context, id uuid.UUID) (*models.Conversation, error)
+	listByUserIDFn func(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error)
+	findPrivateFn  func(ctx context.Context, userID1, userID2 uuid.UUID) (*models.Conversation, error)
+	addMemberFn    func(ctx context.Context, member *models.ConversationMember) error
+	removeMemberFn func(ctx context.Context, convID, userID uuid.UUID) error
+	getMembersFn   func(ctx context.Context, convID uuid.UUID) ([]models.ConversationMember, error)
+	isMemberFn     func(ctx context.Context, convID, userID uuid.UUID) (bool, error)
+	deleteFn       func(ctx context.Context, id uuid.UUID) error
+}
+
+func (m *mockConvRepo) Create(ctx context.Context, conv *models.Conversation) error {
+	if m.createFn != nil {
+		return m.createFn(ctx, conv)
+	}
+	return nil
+}
+func (m *mockConvRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Conversation, error) {
+	if m.getByIDFn != nil {
+		return m.getByIDFn(ctx, id)
+	}
+	return nil, nil
+}
+func (m *mockConvRepo) ListByUserID(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error) {
+	if m.listByUserIDFn != nil {
+		return m.listByUserIDFn(ctx, userID)
+	}
+	return nil, nil
+}
+func (m *mockConvRepo) FindPrivate(ctx context.Context, userID1, userID2 uuid.UUID) (*models.Conversation, error) {
+	if m.findPrivateFn != nil {
+		return m.findPrivateFn(ctx, userID1, userID2)
+	}
+	return nil, nil
+}
+func (m *mockConvRepo) AddMember(ctx context.Context, member *models.ConversationMember) error {
+	if m.addMemberFn != nil {
+		return m.addMemberFn(ctx, member)
+	}
+	return nil
+}
+func (m *mockConvRepo) RemoveMember(ctx context.Context, convID, userID uuid.UUID) error {
+	if m.removeMemberFn != nil {
+		return m.removeMemberFn(ctx, convID, userID)
+	}
+	return nil
+}
+func (m *mockConvRepo) GetMembers(ctx context.Context, convID uuid.UUID) ([]models.ConversationMember, error) {
+	if m.getMembersFn != nil {
+		return m.getMembersFn(ctx, convID)
+	}
+	return nil, nil
+}
+func (m *mockConvRepo) IsMember(ctx context.Context, convID, userID uuid.UUID) (bool, error) {
+	if m.isMemberFn != nil {
+		return m.isMemberFn(ctx, convID, userID)
+	}
 	return false, nil
 }
-func (m *mockQueries) ListMessagesByConversation(ctx context.Context, arg database.ListMessagesByConversationParams) ([]database.ListMessagesByConversationRow, error) {
-	return nil, nil
+func (m *mockConvRepo) Delete(ctx context.Context, id uuid.UUID) error {
+	if m.deleteFn != nil {
+		return m.deleteFn(ctx, id)
+	}
+	return nil
 }
-func (m *mockQueries) ListNotifications(ctx context.Context, arg database.ListNotificationsParams) ([]database.Notification, error) {
-	return nil, nil
+
+type mockMsgRepo struct {
+	createFn         func(ctx context.Context, msg *models.Message) error
+	getByIDFn        func(ctx context.Context, id uuid.UUID) (*models.Message, error)
+	listByConvFn     func(ctx context.Context, convID uuid.UUID, cursor uuid.UUID, limit int) ([]models.Message, error)
+	deleteFn         func(ctx context.Context, id, senderID uuid.UUID) error
+	addReactionFn    func(ctx context.Context, reaction *models.Reaction) error
+	removeReactionFn func(ctx context.Context, messageID, userID uuid.UUID, emoji string) error
 }
-func (m *mockQueries) ListUserConversations(ctx context.Context, userID uuid.UUID) ([]database.ListUserConversationsRow, error) {
-	return nil, nil
+
+func (m *mockMsgRepo) Create(ctx context.Context, msg *models.Message) error {
+	if m.createFn != nil {
+		return m.createFn(ctx, msg)
+	}
+	return nil
 }
-func (m *mockQueries) ListUsers(ctx context.Context) ([]database.ListUsersRow, error) {
-	if m.usersFn != nil {
-		return m.usersFn()
+func (m *mockMsgRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Message, error) {
+	if m.getByIDFn != nil {
+		return m.getByIDFn(ctx, id)
 	}
 	return nil, nil
 }
-func (m *mockQueries) MarkAllNotificationsRead(ctx context.Context, userID uuid.UUID) error {
+func (m *mockMsgRepo) ListByConversation(ctx context.Context, convID uuid.UUID, cursor uuid.UUID, limit int) ([]models.Message, error) {
+	if m.listByConvFn != nil {
+		return m.listByConvFn(ctx, convID, cursor, limit)
+	}
+	return nil, nil
+}
+func (m *mockMsgRepo) Delete(ctx context.Context, id, senderID uuid.UUID) error {
+	if m.deleteFn != nil {
+		return m.deleteFn(ctx, id, senderID)
+	}
 	return nil
 }
-func (m *mockQueries) MarkNotificationRead(ctx context.Context, arg database.MarkNotificationReadParams) error {
+func (m *mockMsgRepo) AddReaction(ctx context.Context, reaction *models.Reaction) error {
+	if m.addReactionFn != nil {
+		return m.addReactionFn(ctx, reaction)
+	}
 	return nil
 }
-func (m *mockQueries) RemoveConversationMember(ctx context.Context, arg database.RemoveConversationMemberParams) error {
+func (m *mockMsgRepo) RemoveReaction(ctx context.Context, messageID, userID uuid.UUID, emoji string) error {
+	if m.removeReactionFn != nil {
+		return m.removeReactionFn(ctx, messageID, userID, emoji)
+	}
 	return nil
 }
-func (m *mockQueries) RemoveReaction(ctx context.Context, arg database.RemoveReactionParams) error {
+
+type mockSessionRepo struct {
+	createFn         func(ctx context.Context, session *models.Session) error
+	getByTokenFn     func(ctx context.Context, refreshToken string) (*models.Session, error)
+	deleteFn         func(ctx context.Context, id uuid.UUID) error
+	deleteByUserIDFn func(ctx context.Context, userID uuid.UUID) error
+	cleanExpiredFn   func(ctx context.Context) error
+}
+
+func (m *mockSessionRepo) Create(ctx context.Context, session *models.Session) error {
+	if m.createFn != nil {
+		return m.createFn(ctx, session)
+	}
 	return nil
 }
-func (m *mockQueries) UpdateUser(ctx context.Context, arg database.UpdateUserParams) (database.UpdateUserRow, error) {
-	return database.UpdateUserRow{}, nil
+func (m *mockSessionRepo) GetByToken(ctx context.Context, refreshToken string) (*models.Session, error) {
+	if m.getByTokenFn != nil {
+		return m.getByTokenFn(ctx, refreshToken)
+	}
+	return nil, nil
 }
-func (m *mockQueries) UpdateUserPassword(ctx context.Context, arg database.UpdateUserPasswordParams) error {
+func (m *mockSessionRepo) Delete(ctx context.Context, id uuid.UUID) error {
+	if m.deleteFn != nil {
+		return m.deleteFn(ctx, id)
+	}
 	return nil
 }
-func (m *mockQueries) UpdateUserStatus(ctx context.Context, arg database.UpdateUserStatusParams) error {
+func (m *mockSessionRepo) DeleteByUserID(ctx context.Context, userID uuid.UUID) error {
+	if m.deleteByUserIDFn != nil {
+		return m.deleteByUserIDFn(ctx, userID)
+	}
 	return nil
+}
+func (m *mockSessionRepo) CleanExpired(ctx context.Context) error {
+	if m.cleanExpiredFn != nil {
+		return m.cleanExpiredFn(ctx)
+	}
+	return nil
+}
+
+type mockNotifRepo struct {
+	createFn         func(ctx context.Context, notification *models.Notification) error
+	listFn           func(ctx context.Context, userID uuid.UUID, limit int) ([]models.Notification, error)
+	markReadFn       func(ctx context.Context, id, userID uuid.UUID) error
+	markAllReadFn    func(ctx context.Context, userID uuid.UUID) error
+	getUnreadCountFn func(ctx context.Context, userID uuid.UUID) (int64, error)
+	deleteFn         func(ctx context.Context, id, userID uuid.UUID) error
+}
+
+func (m *mockNotifRepo) Create(ctx context.Context, notification *models.Notification) error {
+	if m.createFn != nil {
+		return m.createFn(ctx, notification)
+	}
+	return nil
+}
+func (m *mockNotifRepo) List(ctx context.Context, userID uuid.UUID, limit int) ([]models.Notification, error) {
+	if m.listFn != nil {
+		return m.listFn(ctx, userID, limit)
+	}
+	return nil, nil
+}
+func (m *mockNotifRepo) MarkRead(ctx context.Context, id, userID uuid.UUID) error {
+	if m.markReadFn != nil {
+		return m.markReadFn(ctx, id, userID)
+	}
+	return nil
+}
+func (m *mockNotifRepo) MarkAllRead(ctx context.Context, userID uuid.UUID) error {
+	if m.markAllReadFn != nil {
+		return m.markAllReadFn(ctx, userID)
+	}
+	return nil
+}
+func (m *mockNotifRepo) GetUnreadCount(ctx context.Context, userID uuid.UUID) (int64, error) {
+	if m.getUnreadCountFn != nil {
+		return m.getUnreadCountFn(ctx, userID)
+	}
+	return 0, nil
+}
+func (m *mockNotifRepo) Delete(ctx context.Context, id, userID uuid.UUID) error {
+	if m.deleteFn != nil {
+		return m.deleteFn(ctx, id, userID)
+	}
+	return nil
+}
+
+// newMockRepos creates a *repository.Repositories with all mock repositories
+func newMockRepos() *repository.Repositories {
+	return &repository.Repositories{
+		Users:         &mockUserRepo{},
+		Conversations: &mockConvRepo{},
+		Messages:      &mockMsgRepo{},
+		Sessions:      &mockSessionRepo{},
+		Notifications: &mockNotifRepo{},
+	}
 }
 
 // Helper to create a test context with user_id
@@ -145,14 +310,9 @@ func authContext(userID uuid.UUID) context.Context {
 
 // --- Auth Handler Tests ---
 
-type testDB struct {
-	Pool    interface{}
-	Queries *mockQueries
-}
-
 func TestAuthHandler_RegisterValidation(t *testing.T) {
 	authSvc := auth.NewService("test-secret", 15, 7)
-	h := auth.NewHandler(authSvc, nil, &mockQueries{})
+	h := auth.NewHandler(authSvc, newMockRepos())
 
 	tests := []struct {
 		name       string
@@ -182,12 +342,13 @@ func TestAuthHandler_RegisterValidation(t *testing.T) {
 
 func TestAuthHandler_RegisterDuplicateEmail(t *testing.T) {
 	authSvc := auth.NewService("test-secret", 15, 7)
-	mq := &mockQueries{
-		getUserByEmailFn: func(email string) (database.GetUserByEmailRow, error) {
-			return database.GetUserByEmailRow{Email: email}, nil
+	repos := newMockRepos()
+	repos.Users = &mockUserRepo{
+		getByEmailFn: func(ctx context.Context, email string) (*models.User, error) {
+			return &models.User{Email: email}, nil
 		},
 	}
-	h := auth.NewHandler(authSvc, nil, mq)
+	h := auth.NewHandler(authSvc, repos)
 
 	body, _ := json.Marshal(map[string]string{
 		"username": "testuser",
@@ -208,15 +369,16 @@ func TestAuthHandler_RegisterDuplicateEmail(t *testing.T) {
 // --- User Handler Tests ---
 
 func TestUsersHandler_ListUsers(t *testing.T) {
-	mq := &mockQueries{
-		usersFn: func() ([]database.ListUsersRow, error) {
-			return []database.ListUsersRow{
+	repos := newMockRepos()
+	repos.Users = &mockUserRepo{
+		listFn: func(ctx context.Context) ([]models.User, error) {
+			return []models.User{
 				{ID: uuid.New(), Username: "user1", Email: "user1@test.com", DisplayName: "User 1", AvatarUrl: "", Status: "online"},
 				{ID: uuid.New(), Username: "user2", Email: "user2@test.com", DisplayName: "User 2", AvatarUrl: "", Status: "offline"},
 			}, nil
 		},
 	}
-	h := users.NewHandler(mq)
+	h := users.NewHandler(repos)
 
 	req := httptest.NewRequest("GET", "/api/users", nil)
 	req = req.WithContext(authContext(uuid.New()))
@@ -240,8 +402,7 @@ func TestUsersHandler_ListUsers(t *testing.T) {
 // --- Message Handler Tests ---
 
 func TestMessagesHandler_SendMessageValidation(t *testing.T) {
-	mq := &mockQueries{}
-	h := messages.NewHandler(mq)
+	h := messages.NewHandler(newMockRepos())
 
 	tests := []struct {
 		name       string
@@ -271,8 +432,7 @@ func TestMessagesHandler_SendMessageValidation(t *testing.T) {
 // --- Conversation Handler Tests ---
 
 func TestConversationsHandler_CreateConversationValidation(t *testing.T) {
-	mq := &mockQueries{}
-	h := conversations.NewHandler(mq)
+	h := conversations.NewHandler(newMockRepos())
 
 	tests := []struct {
 		name       string
