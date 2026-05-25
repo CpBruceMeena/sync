@@ -16,7 +16,6 @@ import (
 	"github.com/CpBruceMeena/sync/internal/conversations"
 	"github.com/CpBruceMeena/sync/internal/database"
 	"github.com/CpBruceMeena/sync/internal/messages"
-	"github.com/CpBruceMeena/sync/internal/models"
 	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/CpBruceMeena/sync/internal/users"
 	"github.com/CpBruceMeena/sync/internal/websocket"
@@ -30,22 +29,6 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
-
-	// Auto-migrate schema
-	if err := db.DB.AutoMigrate(
-		&models.User{},
-		&models.Session{},
-		&models.Conversation{},
-		&models.ConversationMember{},
-		&models.Message{},
-		&models.Reaction{},
-		&models.Attachment{},
-		&models.Notification{},
-		&models.Presence{},
-		&models.TypingEvent{},
-	); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
-	}
 
 	repos := repository.NewRepositories(db.DB)
 	authService := auth.NewService(cfg.JWTSecret, cfg.AccessTTL, cfg.RefreshTTL)

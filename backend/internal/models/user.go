@@ -8,8 +8,8 @@ import (
 
 type User struct {
 	ID           uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()" json:"id"`
-	Username     string    `gorm:"uniqueIndex;not null;size:50" json:"username"`
-	Email        string    `gorm:"uniqueIndex;not null;size:255" json:"email"`
+	Username     string    `gorm:"unique;not null;size:50" json:"username"`
+	Email        string    `gorm:"unique;not null;size:255" json:"email"`
 	PasswordHash string    `gorm:"column:password_hash;not null" json:"-"`
 	DisplayName  string    `gorm:"column:display_name;size:100" json:"display_name"`
 	AvatarUrl    string    `gorm:"column:avatar_url;size:500" json:"avatar_url"`

@@ -74,6 +74,7 @@ start_backend() {
         echo -e "${GREEN}Backend started (PID $(cat $PID_FILE))${NC}"
         echo -e "${GREEN}Backend API: http://localhost:${SERVER_PORT:-8080}${NC}"
         echo -e "${GREEN}Swagger Docs: http://localhost:${SERVER_PORT:-8080}/swagger/index.html${NC}"
+        echo -e "${GREEN}Frontend: http://localhost:3000${NC}"
         echo -e "${GREEN}Logs: .backend.log${NC}"
     else
         echo -e "${RED}Backend failed to start. Check .backend.log${NC}"

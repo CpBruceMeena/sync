@@ -40,6 +40,9 @@ Thumbs.db
 # Log files
 *.log
 
+# Runtime PID files
+*.pid
+
 # Binary output directory
 bin/
 dist/
