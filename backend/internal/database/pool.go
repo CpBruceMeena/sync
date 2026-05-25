@@ -46,11 +46,3 @@ func (db *DB) Close() {
 	}
 	sqlDB.Close()
 }
-
-func (db *DB) RunMigrations(dbInstance *gorm.DB) error {
-	if err := dbInstance.AutoMigrate(); err != nil {
-		return fmt.Errorf("auto migrate: %w", err)
-	}
-	log.Println("Database migrations applied")
-	return nil
-}
