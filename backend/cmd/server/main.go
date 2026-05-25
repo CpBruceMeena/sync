@@ -30,14 +30,6 @@ func main() {
 	}
 	defer db.Close()
 
-	schemaDir := "sql/schema"
-	if _, err := os.Stat(schemaDir); os.IsNotExist(err) {
-		schemaDir = "backend/sql/schema"
-	}
-	if err := db.RunMigrations(ctx, schemaDir); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
-	}
-
 	authService := auth.NewService(cfg.JWTSecret, cfg.AccessTTL, cfg.RefreshTTL)
 
 	authHandler := auth.NewHandler(authService, db, db.Queries)

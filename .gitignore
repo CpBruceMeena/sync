@@ -51,6 +51,16 @@ debug.test
 # Go specific
 backend/vendor/
 backend/sync
+backend/scripts/
+
+# Root-level compiled Go binary
+server
+
+# Screenshots
+screenshots/
+
+# Runtime PID files
+*.pid
 
 # Node specific
 frontend/node_modules/

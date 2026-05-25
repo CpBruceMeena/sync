@@ -20,7 +20,7 @@ if [ -f ".env" ]; then
     source .env
     set +a
     echo -e "${GREEN}Loaded environment from .env${NC}"
-fi"
+fi
 
 # Check if Go is installed
 if ! command -v go &> /dev/null; then
@@ -50,6 +50,22 @@ else
     echo -e "${GREEN}Frontend dependencies already installed${NC}"
 fi
 
+# Kill any existing process on the given port
+kill_port() {
+    local port=$1
+    local pid=$(lsof -ti:$port 2>/dev/null)
+    if [ -n "$pid" ]; then
+        echo -e "${YELLOW}Port $port is in use (PID: $pid). Stopping existing process...${NC}"
+        kill -15 $pid 2>/dev/null
+        sleep 1
+        # Force kill if still running
+        if kill -0 $pid 2>/dev/null; then
+            kill -9 $pid 2>/dev/null
+        fi
+        echo -e "${GREEN}Stopped process on port $port${NC}"
+    fi
+}
+
 # Build the Go binary
 echo -e "${YELLOW}Building Go backend...${NC}"
 cd backend
@@ -64,6 +80,7 @@ if [ $? -eq 0 ]; then
     echo -e "${GREEN}Swagger Docs: http://localhost:${SERVER_PORT:-8080}/swagger/index.html${NC}"
     echo -e "${YELLOW}Start frontend separately: cd frontend && npm run dev${NC}"
     echo -e "${YELLOW}Press Ctrl+C to stop the server${NC}"
+    kill_port ${SERVER_PORT:-8080}
     cd backend
     ./sync
 else
