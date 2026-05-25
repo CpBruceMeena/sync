@@ -58,7 +58,7 @@ export function Sidebar() {
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center overflow-hidden">
-                <img src="/logo.png" alt="sync" className="w-full h-full object-contain p-1" />
+                <img src="/sync_logo.png" alt="sync" className="w-full h-full object-contain p-1" />
               </div>
               <span className="text-sm font-semibold text-[var(--foreground)]">
                 sync

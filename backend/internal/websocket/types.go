@@ -4,7 +4,7 @@ import (
 	"sync"
 
 	"github.com/CpBruceMeena/sync/internal/auth"
-	"github.com/CpBruceMeena/sync/internal/database"
+	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
@@ -24,7 +24,7 @@ const (
 type WsHandler struct {
 	hub         *Hub
 	authService *auth.Service
-	queries     database.Querier
+	repos       *repository.Repositories
 }
 
 // WSMessage is the WebSocket message format exchanged between clients and server

@@ -1,42 +1,48 @@
 package database
 
 import (
-	"context"
 	"fmt"
 	"log"
 
-	"github.com/jackc/pgx/v5/pgxpool"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 type DB struct {
-	Pool    *pgxpool.Pool
-	Queries *Queries
+	DB *gorm.DB
 }
 
-func NewDB(ctx context.Context, dsn string) (*DB, error) {
-	config, err := pgxpool.ParseConfig(dsn)
-	if err != nil {
-		return nil, fmt.Errorf("parse pool config: %w", err)
+func NewDB(dsn string) (*DB, error) {
+	config := &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Warn),
 	}
 
-	config.MaxConns = 25
-
-	pool, err := pgxpool.NewWithConfig(ctx, config)
+	db, err := gorm.Open(postgres.Open(dsn), config)
 	if err != nil {
-		return nil, fmt.Errorf("create connection pool: %w", err)
+		return nil, fmt.Errorf("connect to database: %w", err)
 	}
 
-	if err := pool.Ping(ctx); err != nil {
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("get underlying sql db: %w", err)
+	}
+
+	sqlDB.SetMaxOpenConns(25)
+
+	if err := sqlDB.Ping(); err != nil {
 		return nil, fmt.Errorf("ping database: %w", err)
 	}
 
 	log.Println("Connected to PostgreSQL database")
-	return &DB{
-		Pool:    pool,
-		Queries: New(pool),
-	}, nil
+	return &DB{DB: db}, nil
 }
 
 func (db *DB) Close() {
-	db.Pool.Close()
+	sqlDB, err := db.DB.DB()
+	if err != nil {
+		log.Printf("Error getting underlying sql db: %v", err)
+		return
+	}
+	sqlDB.Close()
 }

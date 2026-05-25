@@ -1,53 +1,46 @@
 package conversations
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
-	"github.com/CpBruceMeena/sync/internal/database"
+	"github.com/CpBruceMeena/sync/internal/models"
+	"github.com/CpBruceMeena/sync/internal/repository"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
-func NewHandler(queries database.Querier) *Handler {
-	return &Handler{queries: queries}
+func NewHandler(repos *repository.Repositories) *Handler {
+	return &Handler{repos: repos}
 }
 
 // ListConversations returns all conversations for the authenticated user
-// @Summary List conversations
-// @Description Get all conversations (private and group) for the authenticated user
-// @Tags conversations
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Success 200 {array} map[string]interface{}
-// @Failure 500 {object} map[string]string
-// @Router /api/conversations [get]
 func (h *Handler) ListConversations(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(uuid.UUID)
 
-	convs, err := h.queries.ListUserConversations(r.Context(), userID)
+	convs, err := h.repos.Conversations.ListByUserID(r.Context(), userID)
 	if err != nil {
 		log.Printf("Error listing conversations: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to list conversations")
 		return
 	}
 
-	respondJSON(w, http.StatusOK, convs)
+	response := make([]ConversationResponse, 0, len(convs))
+	for _, conv := range convs {
+		resp := convToResponse(conv)
+		resp.Members = getMembers(h, conv.ID)
+		resp.LastMessageContent = getLastMessageContent(h, conv.ID)
+		resp.LastMessageAt = getLastMessageAt(h, conv.ID)
+		response = append(response, resp)
+	}
+
+	respondJSON(w, http.StatusOK, response)
 }
 
 // CreateConversation creates a new conversation
-// @Summary Create conversation
-// @Description Create a new private or group conversation
-// @Tags conversations
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Success 201 {object} map[string]interface{}
-// @Failure 400 {object} map[string]string
-// @Failure 500 {object} map[string]string
-// @Router /api/conversations [post]
 func (h *Handler) CreateConversation(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(uuid.UUID)
 
@@ -72,46 +65,41 @@ func (h *Handler) CreateConversation(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		otherUser, err := h.queries.GetUserByUsername(r.Context(), req.Members[0])
+		otherUser, err := h.repos.Users.GetByUsername(r.Context(), req.Members[0])
 		if err != nil {
 			respondError(w, http.StatusNotFound, "User not found")
 			return
 		}
 
 		// Check if private conversation already exists
-		existing, err := h.queries.FindPrivateConversation(r.Context(), database.FindPrivateConversationParams{
-			UserID:   userID,
-			UserID_2: otherUser.ID,
-		})
-		if err == nil && existing.ID != uuid.Nil {
-			respondJSON(w, http.StatusOK, existing)
+		existing, err := h.repos.Conversations.FindPrivate(r.Context(), userID, otherUser.ID)
+		if err == nil && existing != nil {
+			respondJSON(w, http.StatusOK, convToResponse(*existing))
 			return
 		}
 
-		conv, err := h.queries.CreateConversation(r.Context(), database.CreateConversationParams{
-			Type:    "private",
-			Name:    "",
-			AdminID: pgtype.UUID{Valid: false}, // null
-		})
-		if err != nil {
+		conv := &models.Conversation{
+			Type: "private",
+		}
+		if err := h.repos.Conversations.Create(r.Context(), conv); err != nil {
 			log.Printf("Error creating conversation: %v", err)
 			respondError(w, http.StatusInternalServerError, "Failed to create conversation")
 			return
 		}
 
 		// Add both members
-		h.queries.AddConversationMember(r.Context(), database.AddConversationMemberParams{
+		h.repos.Conversations.AddMember(r.Context(), &models.ConversationMember{
 			ConversationID: conv.ID,
 			UserID:         userID,
 			Role:           "member",
 		})
-		h.queries.AddConversationMember(r.Context(), database.AddConversationMemberParams{
+		h.repos.Conversations.AddMember(r.Context(), &models.ConversationMember{
 			ConversationID: conv.ID,
 			UserID:         otherUser.ID,
 			Role:           "member",
 		})
 
-		respondJSON(w, http.StatusCreated, conv)
+		respondJSON(w, http.StatusCreated, convToResponse(*conv))
 		return
 	}
 
@@ -120,25 +108,24 @@ func (h *Handler) CreateConversation(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "Group name is required")
 		return
 	}
-
 	if len(req.Members) == 0 {
 		respondError(w, http.StatusBadRequest, "At least one member is required")
 		return
 	}
 
-	conv, err := h.queries.CreateConversation(r.Context(), database.CreateConversationParams{
+	conv := &models.Conversation{
 		Type:    "group",
 		Name:    req.Name,
-		AdminID: pgtype.UUID{Bytes: userID, Valid: true},
-	})
-	if err != nil {
+		AdminID: &userID,
+	}
+	if err := h.repos.Conversations.Create(r.Context(), conv); err != nil {
 		log.Printf("Error creating group: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to create group")
 		return
 	}
 
 	// Add admin
-	h.queries.AddConversationMember(r.Context(), database.AddConversationMemberParams{
+	h.repos.Conversations.AddMember(r.Context(), &models.ConversationMember{
 		ConversationID: conv.ID,
 		UserID:         userID,
 		Role:           "admin",
@@ -146,35 +133,23 @@ func (h *Handler) CreateConversation(w http.ResponseWriter, r *http.Request) {
 
 	// Add members
 	for _, memberUsername := range req.Members {
-		memberUser, err := h.queries.GetUserByUsername(r.Context(), memberUsername)
+		memberUser, err := h.repos.Users.GetByUsername(r.Context(), memberUsername)
 		if err != nil {
 			continue
 		}
-		h.queries.AddConversationMember(r.Context(), database.AddConversationMemberParams{
+		h.repos.Conversations.AddMember(r.Context(), &models.ConversationMember{
 			ConversationID: conv.ID,
 			UserID:         memberUser.ID,
 			Role:           "member",
 		})
 	}
 
-	respondJSON(w, http.StatusCreated, conv)
+	respondJSON(w, http.StatusCreated, convToResponse(*conv))
 }
 
 // AddMember adds a member to a group conversation
-// @Summary Add member
-// @Description Add a user to a group conversation
-// @Tags conversations
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param id path string true "Conversation ID"
-// @Success 200 {object} map[string]string
-// @Failure 400 {object} map[string]string
-// @Failure 404 {object} map[string]string
-// @Failure 500 {object} map[string]string
-// @Router /api/conversations/{id}/members [post]
 func (h *Handler) AddMember(w http.ResponseWriter, r *http.Request) {
-	convIDStr := r.PathValue("id")
+	convIDStr := chi.URLParam(r, "id")
 	convID, err := uuid.Parse(convIDStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid conversation ID")
@@ -189,18 +164,17 @@ func (h *Handler) AddMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.queries.GetUserByUsername(r.Context(), req.Username)
+	user, err := h.repos.Users.GetByUsername(r.Context(), req.Username)
 	if err != nil {
 		respondError(w, http.StatusNotFound, "User not found")
 		return
 	}
 
-	_, err = h.queries.AddConversationMember(r.Context(), database.AddConversationMemberParams{
+	if err := h.repos.Conversations.AddMember(r.Context(), &models.ConversationMember{
 		ConversationID: convID,
 		UserID:         user.ID,
 		Role:           "member",
-	})
-	if err != nil {
+	}); err != nil {
 		log.Printf("Error adding member: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to add member")
 		return
@@ -210,37 +184,22 @@ func (h *Handler) AddMember(w http.ResponseWriter, r *http.Request) {
 }
 
 // RemoveMember removes a member from a group conversation
-// @Summary Remove member
-// @Description Remove a user from a group conversation
-// @Tags conversations
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param id path string true "Conversation ID"
-// @Param userId path string true "User ID to remove"
-// @Success 200 {object} map[string]string
-// @Failure 400 {object} map[string]string
-// @Failure 500 {object} map[string]string
-// @Router /api/conversations/{id}/members/{userId} [delete]
 func (h *Handler) RemoveMember(w http.ResponseWriter, r *http.Request) {
-	convIDStr := r.PathValue("id")
+	convIDStr := chi.URLParam(r, "id")
 	convID, err := uuid.Parse(convIDStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
-	memberIDStr := r.PathValue("userId")
+	memberIDStr := chi.URLParam(r, "userId")
 	memberID, err := uuid.Parse(memberIDStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid member ID")
 		return
 	}
 
-	if err := h.queries.RemoveConversationMember(r.Context(), database.RemoveConversationMemberParams{
-		ConversationID: convID,
-		UserID:         memberID,
-	}); err != nil {
+	if err := h.repos.Conversations.RemoveMember(r.Context(), convID, memberID); err != nil {
 		log.Printf("Error removing member: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to remove member")
 		return
@@ -250,32 +209,78 @@ func (h *Handler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetConversation returns a specific conversation by ID
-// @Summary Get conversation
-// @Description Get a conversation by its ID
-// @Tags conversations
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param id path string true "Conversation ID"
-// @Success 200 {object} map[string]interface{}
-// @Failure 400 {object} map[string]string
-// @Failure 404 {object} map[string]string
-// @Router /api/conversations/{id} [get]
 func (h *Handler) GetConversation(w http.ResponseWriter, r *http.Request) {
-	convIDStr := r.PathValue("id")
+	convIDStr := chi.URLParam(r, "id")
 	convID, err := uuid.Parse(convIDStr)
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "Invalid conversation ID")
 		return
 	}
 
-	conv, err := h.queries.GetConversationByID(r.Context(), convID)
+	conv, err := h.repos.Conversations.GetByID(r.Context(), convID)
 	if err != nil {
 		respondError(w, http.StatusNotFound, "Conversation not found")
 		return
 	}
 
-	respondJSON(w, http.StatusOK, conv)
+	resp := convToResponse(*conv)
+	resp.Members = getMembers(h, conv.ID)
+
+	respondJSON(w, http.StatusOK, resp)
+}
+
+// Helper: convert models.Conversation to ConversationResponse
+func convToResponse(conv models.Conversation) ConversationResponse {
+	return ConversationResponse{
+		ID:        conv.ID,
+		Type:      conv.Type,
+		Name:      conv.Name,
+		AdminID:   conv.AdminID,
+		CreatedAt: conv.CreatedAt,
+		UpdatedAt: conv.UpdatedAt,
+	}
+}
+
+// Helper: get members for a conversation
+func getMembers(h *Handler, convID uuid.UUID) []MemberResponse {
+	members, err := h.repos.Conversations.GetMembers(context.Background(), convID)
+	if err != nil {
+		return nil
+	}
+
+	result := make([]MemberResponse, 0, len(members))
+	for _, m := range members {
+		user, err := h.repos.Users.GetByID(context.Background(), m.UserID)
+		username := ""
+		if err == nil && user != nil {
+			username = user.Username
+		}
+		result = append(result, MemberResponse{
+			UserID:   m.UserID,
+			Username: username,
+			Role:     m.Role,
+			JoinedAt: m.JoinedAt,
+		})
+	}
+	return result
+}
+
+// Helper: get last message content for a conversation
+func getLastMessageContent(h *Handler, convID uuid.UUID) *string {
+	msgs, err := h.repos.Messages.ListByConversation(context.Background(), convID, uuid.Nil, 1)
+	if err != nil || len(msgs) == 0 {
+		return nil
+	}
+	return &msgs[0].Content
+}
+
+// Helper: get last message time for a conversation
+func getLastMessageAt(h *Handler, convID uuid.UUID) *time.Time {
+	msgs, err := h.repos.Messages.ListByConversation(context.Background(), convID, uuid.Nil, 1)
+	if err != nil || len(msgs) == 0 {
+		return nil
+	}
+	return &msgs[0].CreatedAt
 }
 
 func respondJSON(w http.ResponseWriter, status int, data interface{}) {

@@ -7,16 +7,16 @@ import (
 	"strings"
 	"time"
 
-	"github.com/CpBruceMeena/sync/internal/database"
+	"github.com/CpBruceMeena/sync/internal/models"
+	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
-func NewHandler(authService *Service, db *database.DB, queries database.Querier) *Handler {
+func NewHandler(authService *Service, repos *repository.Repositories) *Handler {
 	return &Handler{
 		authService: authService,
-		db:          db,
-		queries:     queries,
+		repos:       repos,
 	}
 }
 
@@ -52,15 +52,15 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check if email already exists
-	existing, err := h.queries.GetUserByEmail(r.Context(), req.Email)
-	if err == nil && existing.Email != "" {
+	existing, err := h.repos.Users.GetByEmail(r.Context(), req.Email)
+	if err == nil && existing != nil {
 		respondError(w, http.StatusConflict, "Email already registered")
 		return
 	}
 
 	// Check if username already exists
-	existingUser, err := h.queries.GetUserByUsername(r.Context(), req.Username)
-	if err == nil && existingUser.Username != "" {
+	existingUser, err := h.repos.Users.GetByUsername(r.Context(), req.Username)
+	if err == nil && existingUser != nil {
 		respondError(w, http.StatusConflict, "Username already taken")
 		return
 	}
@@ -72,13 +72,14 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.queries.CreateUser(r.Context(), database.CreateUserParams{
+	user := &models.User{
 		Username:     req.Username,
 		Email:        req.Email,
 		PasswordHash: string(hashedPassword),
 		DisplayName:  req.Username,
-	})
-	if err != nil {
+		Status:       "offline",
+	}
+	if err := h.repos.Users.Create(r.Context(), user); err != nil {
 		log.Printf("Error creating user: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to create user")
 		return
@@ -92,12 +93,11 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store refresh token
-	_, err = h.queries.CreateSession(r.Context(), database.CreateSessionParams{
+	if err := h.repos.Sessions.Create(r.Context(), &models.Session{
 		UserID:       user.ID,
 		RefreshToken: tokens.RefreshToken,
 		ExpiresAt:    time.Now().Add(7 * 24 * time.Hour),
-	})
-	if err != nil {
+	}); err != nil {
 		log.Printf("Error creating session: %v", err)
 	}
 
@@ -139,7 +139,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.queries.GetUserByEmailWithPassword(r.Context(), req.Email)
+	user, err := h.repos.Users.GetByEmailWithPassword(r.Context(), req.Email)
 	if err != nil {
 		respondError(w, http.StatusUnauthorized, "Invalid email or password")
 		return
@@ -158,12 +158,11 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store refresh token
-	_, err = h.queries.CreateSession(r.Context(), database.CreateSessionParams{
+	if err := h.repos.Sessions.Create(r.Context(), &models.Session{
 		UserID:       user.ID,
 		RefreshToken: tokens.RefreshToken,
 		ExpiresAt:    time.Now().Add(7 * 24 * time.Hour),
-	})
-	if err != nil {
+	}); err != nil {
 		log.Printf("Error creating session: %v", err)
 	}
 
@@ -203,28 +202,28 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session, err := h.queries.GetSessionByToken(r.Context(), req.RefreshToken)
+	session, err := h.repos.Sessions.GetByToken(r.Context(), req.RefreshToken)
 	if err != nil {
 		respondError(w, http.StatusUnauthorized, "Invalid refresh token")
 		return
 	}
 
 	if session.ExpiresAt.Before(time.Now()) {
-		h.queries.DeleteSession(r.Context(), session.ID)
+		h.repos.Sessions.Delete(r.Context(), session.ID)
 		respondError(w, http.StatusUnauthorized, "Refresh token expired")
 		return
 	}
 
 	// Delete old session
-	h.queries.DeleteSession(r.Context(), session.ID)
+	h.repos.Sessions.Delete(r.Context(), session.ID)
 
-	userID, err := uuid.Parse(session.UserID.String())
+	user, err := h.repos.Users.GetByID(r.Context(), session.UserID)
 	if err != nil {
-		respondError(w, http.StatusInternalServerError, "Failed to parse user ID")
+		respondError(w, http.StatusInternalServerError, "User not found")
 		return
 	}
 
-	tokens, err := h.authService.GenerateTokens(userID, session.Username)
+	tokens, err := h.authService.GenerateTokens(user.ID, user.Username)
 	if err != nil {
 		log.Printf("Error generating tokens: %v", err)
 		respondError(w, http.StatusInternalServerError, "Failed to generate tokens")
@@ -232,12 +231,11 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Store new refresh token
-	_, err = h.queries.CreateSession(r.Context(), database.CreateSessionParams{
-		UserID:       userID,
+	if err := h.repos.Sessions.Create(r.Context(), &models.Session{
+		UserID:       user.ID,
 		RefreshToken: tokens.RefreshToken,
 		ExpiresAt:    time.Now().Add(7 * 24 * time.Hour),
-	})
-	if err != nil {
+	}); err != nil {
 		log.Printf("Error creating session: %v", err)
 	}
 
@@ -258,7 +256,7 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(uuid.UUID)
 
-	if err := h.queries.DeleteUserSessions(r.Context(), userID); err != nil {
+	if err := h.repos.Sessions.DeleteByUserID(r.Context(), userID); err != nil {
 		log.Printf("Error deleting sessions: %v", err)
 	}
 
@@ -278,7 +276,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(uuid.UUID)
 
-	user, err := h.queries.GetUserByID(r.Context(), userID)
+	user, err := h.repos.Users.GetByID(r.Context(), userID)
 	if err != nil {
 		respondError(w, http.StatusNotFound, "User not found")
 		return

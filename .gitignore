@@ -40,6 +40,9 @@ Thumbs.db
 # Log files
 *.log
 
+# Runtime PID files
+*.pid
+
 # Binary output directory
 bin/
 dist/
@@ -51,14 +54,12 @@ debug.test
 # Go specific
 backend/vendor/
 backend/sync
-backend/scripts/
-
+backend/server
+backend/sql/
 # Root-level compiled Go binary
-server
-
+/server
 # Screenshots
 screenshots/
-
 # Runtime PID files
 *.pid
 
@@ -82,4 +83,22 @@ crg-cache/
 .cache/code-review-graph/
 .cache/crg/
 *.crg
-.code-review-graph/
+
+
+# Next.js build output
+.next/
+next-env.d.ts
+
+# Screenshots
+screenshots/
+
+# Media files
+*.mp4
+*.mov
+
+# Temporary / planning docs
+provect-revamp.md
+medium-article.md
+
+# Go vendor (go.mod manages dependencies)
+vendor/

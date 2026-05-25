@@ -16,30 +16,32 @@ import (
 	"github.com/CpBruceMeena/sync/internal/conversations"
 	"github.com/CpBruceMeena/sync/internal/database"
 	"github.com/CpBruceMeena/sync/internal/messages"
+	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/CpBruceMeena/sync/internal/users"
 	"github.com/CpBruceMeena/sync/internal/websocket"
 )
 
 func main() {
 	cfg := config.Load()
-	ctx := context.Background()
 
-	db, err := database.NewDB(ctx, cfg.DSN())
+	db, err := database.NewDB(cfg.DSN())
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
 
+	repos := repository.NewRepositories(db.DB)
+
 	authService := auth.NewService(cfg.JWTSecret, cfg.AccessTTL, cfg.RefreshTTL)
 
-	authHandler := auth.NewHandler(authService, db, db.Queries)
-	usersHandler := users.NewHandler(db.Queries)
-	conversationsHandler := conversations.NewHandler(db.Queries)
-	messagesHandler := messages.NewHandler(db.Queries)
+	authHandler := auth.NewHandler(authService, repos)
+	usersHandler := users.NewHandler(repos)
+	conversationsHandler := conversations.NewHandler(repos)
+	messagesHandler := messages.NewHandler(repos)
 
 	wsHub := websocket.NewHub()
 	go wsHub.Run()
-	wsHandler := websocket.NewWsHandler(wsHub, authService, db.Queries)
+	wsHandler := websocket.NewWsHandler(wsHub, authService, repos)
 
 	// All routes are defined in internal/api/routes.go
 	r := api.SetupRoutes(
