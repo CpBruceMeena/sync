@@ -57,7 +57,11 @@ backend/sync
 backend/server
 backend/sql/
 # Root-level compiled Go binary
-server
+/server
+# Screenshots
+screenshots/
+# Runtime PID files
+*.pid
 
 # Node specific
 frontend/node_modules/

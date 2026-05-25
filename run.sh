@@ -43,6 +43,22 @@ install_deps() {
     fi
 }
 
+# Kill any existing process on the given port
+kill_port() {
+    local port=$1
+    local pid=$(lsof -ti:$port 2>/dev/null)
+    if [ -n "$pid" ]; then
+        echo -e "${YELLOW}Port $port is in use (PID: $pid). Stopping existing process...${NC}"
+        kill -15 $pid 2>/dev/null
+        sleep 1
+        # Force kill if still running
+        if kill -0 $pid 2>/dev/null; then
+            kill -9 $pid 2>/dev/null
+        fi
+        echo -e "${GREEN}Stopped process on port $port${NC}"
+    fi
+}
+
 # Build the Go binary
 build_backend() {
     echo -e "${YELLOW}Building Go backend...${NC}"
@@ -56,6 +72,9 @@ start_backend() {
         echo -e "${YELLOW}Backend is already running (PID $(cat $PID_FILE))${NC}"
         return
     fi
+
+    # Kill any process still holding the port
+    kill_port ${SERVER_PORT:-8080}
 
     load_env
     build_backend

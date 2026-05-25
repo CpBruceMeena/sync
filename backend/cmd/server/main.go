@@ -31,6 +31,7 @@ func main() {
 	defer db.Close()
 
 	repos := repository.NewRepositories(db.DB)
+
 	authService := auth.NewService(cfg.JWTSecret, cfg.AccessTTL, cfg.RefreshTTL)
 
 	authHandler := auth.NewHandler(authService, repos)
