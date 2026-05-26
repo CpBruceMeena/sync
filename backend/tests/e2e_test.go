@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"testing"
+	"time"
 
 	"github.com/CpBruceMeena/sync/internal/api"
 	"github.com/CpBruceMeena/sync/internal/auth"
@@ -33,6 +34,36 @@ type e2eTestSuite struct {
 	authSvc *auth.Service
 	mux     http.Handler
 	baseURL string
+}
+
+// Test response types for verifying DB state
+
+type ConversationTestResponse struct {
+	ID                 uuid.UUID            `json:"id"`
+	Type               string               `json:"type"`
+	Name               string               `json:"name"`
+	AdminID            *uuid.UUID           `json:"admin_id"`
+	CreatedAt          time.Time            `json:"created_at"`
+	UpdatedAt          time.Time            `json:"updated_at"`
+	Members            []MemberTestResponse `json:"members,omitempty"`
+	LastMessageContent *string              `json:"last_message_content,omitempty"`
+	LastMessageAt      *time.Time           `json:"last_message_at,omitempty"`
+}
+
+type MemberTestResponse struct {
+	UserID   uuid.UUID `json:"user_id"`
+	Username string    `json:"username"`
+	Role     string    `json:"role"`
+	JoinedAt time.Time `json:"joined_at"`
+}
+
+type MessageTestResponse struct {
+	ID             uuid.UUID `json:"id"`
+	ConversationID uuid.UUID `json:"conversation_id"`
+	SenderID       uuid.UUID `json:"sender_id"`
+	Content        string    `json:"content"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 func isDockerAvailable() bool {
@@ -259,7 +290,16 @@ func TestE2E_ConversationsAndMessages(t *testing.T) {
 	parseResponse(t, regBob, &bobAuth)
 	bobToken := bobAuth.Token.AccessToken
 
-	t.Run("create private conversation", func(t *testing.T) {
+	// Register a third user for group tests
+	regCharlie := s.doRequest("POST", "/api/auth/register", map[string]string{
+		"username": "charlie_e2e", "email": "charlie_e2e@test.com", "password": "password123",
+	}, "")
+	require.Equal(t, http.StatusCreated, regCharlie.Code)
+	var charlieAuth auth.AuthResponse
+	parseResponse(t, regCharlie, &charlieAuth)
+	charlieToken := charlieAuth.Token.AccessToken
+
+	t.Run("create private conversation and verify DB state", func(t *testing.T) {
 		// Alice creates a private conversation with Bob
 		createResp := s.doRequest("POST", "/api/conversations", map[string]interface{}{
 			"type":    "private",
@@ -267,38 +307,56 @@ func TestE2E_ConversationsAndMessages(t *testing.T) {
 		}, aliceToken)
 		require.Equal(t, http.StatusCreated, createResp.Code, "create private conv failed: %s", createResp.Body.String())
 
-		var conv map[string]interface{}
+		var conv ConversationTestResponse
 		parseResponse(t, createResp, &conv)
-		require.Equal(t, "private", conv["type"])
+		require.Equal(t, "private", conv.Type)
 
 		// Verify it appears in Alice's conversation list
 		listResp := s.doRequest("GET", "/api/conversations", nil, aliceToken)
 		require.Equal(t, http.StatusOK, listResp.Code)
-		var convs []map[string]interface{}
+		var convs []ConversationTestResponse
 		parseResponse(t, listResp, &convs)
 		require.GreaterOrEqual(t, len(convs), 1, "expected at least 1 conversation")
+
+		// Verify it also appears in Bob's conversation list
+		bobListResp := s.doRequest("GET", "/api/conversations", nil, bobToken)
+		require.Equal(t, http.StatusOK, bobListResp.Code)
+		var bobConvs []ConversationTestResponse
+		parseResponse(t, bobListResp, &bobConvs)
+		require.GreaterOrEqual(t, len(bobConvs), 1, "expected Bob to see the conversation")
 	})
 
-	t.Run("send and list messages", func(t *testing.T) {
-		// First create a conversation
+	var existingConvID string
+	t.Run("send and list messages with DB verification", func(t *testing.T) {
+		// Use unique users for this subtest to avoid the private-conversation-already-exists case
+		regUnique := s.doRequest("POST", "/api/auth/register", map[string]string{
+			"username": "unique_sender", "email": "unique_sender@test.com", "password": "password123",
+		}, "")
+		require.Equal(t, http.StatusCreated, regUnique.Code)
+		var uniqueAuth auth.AuthResponse
+		parseResponse(t, regUnique, &uniqueAuth)
+		uniqueToken := uniqueAuth.Token.AccessToken
+
+		// Create a new unique private conversation
 		createResp := s.doRequest("POST", "/api/conversations", map[string]interface{}{
 			"type":    "private",
 			"members": []string{"bob_e2e"},
-		}, aliceToken)
+		}, uniqueToken)
 		require.Equal(t, http.StatusCreated, createResp.Code)
-		var conv map[string]interface{}
+		var conv ConversationTestResponse
 		parseResponse(t, createResp, &conv)
-		convID := conv["id"].(string)
+		convID := conv.ID.String()
+		existingConvID = convID
 
-		// Alice sends a message
+		// Alice (unique_sender) sends a message
 		sendResp := s.doRequest("POST", "/api/conversations/"+convID+"/messages", map[string]interface{}{
 			"content": "Hello Bob!",
-		}, aliceToken)
+		}, uniqueToken)
 		require.Equal(t, http.StatusCreated, sendResp.Code, "send message failed: %s", sendResp.Body.String())
 
-		var msg map[string]interface{}
+		var msg MessageTestResponse
 		parseResponse(t, sendResp, &msg)
-		require.Equal(t, "Hello Bob!", msg["content"])
+		require.Equal(t, "Hello Bob!", msg.Content)
 
 		// Bob sends a reply
 		sendResp2 := s.doRequest("POST", "/api/conversations/"+convID+"/messages", map[string]interface{}{
@@ -306,32 +364,70 @@ func TestE2E_ConversationsAndMessages(t *testing.T) {
 		}, bobToken)
 		require.Equal(t, http.StatusCreated, sendResp2.Code, "bob send failed: %s", sendResp2.Body.String())
 
-		// List messages
-		listMsgResp := s.doRequest("GET", "/api/conversations/"+convID+"/messages", nil, aliceToken)
+		// List messages (verify both appear)
+		listMsgResp := s.doRequest("GET", "/api/conversations/"+convID+"/messages", nil, uniqueToken)
 		require.Equal(t, http.StatusOK, listMsgResp.Code, "list messages failed: %s", listMsgResp.Body.String())
 
-		var msgs []map[string]interface{}
+		var msgs []MessageTestResponse
 		parseResponse(t, listMsgResp, &msgs)
 		require.GreaterOrEqual(t, len(msgs), 2, "expected at least 2 messages")
+		// Messages are returned newest-first, so msgs[1] is the first message
+		require.Equal(t, "Hello Bob!", msgs[1].Content)
+		require.Equal(t, "Hey Alice!", msgs[0].Content)
 	})
 
-	t.Run("create group conversation", func(t *testing.T) {
+	t.Run("create group conversation with DB verification", func(t *testing.T) {
 		createResp := s.doRequest("POST", "/api/conversations", map[string]interface{}{
 			"type":    "group",
 			"name":    "Test Group",
-			"members": []string{"bob_e2e"},
+			"members": []string{"bob_e2e", "charlie_e2e"},
 		}, aliceToken)
 		require.Equal(t, http.StatusCreated, createResp.Code, "create group failed: %s", createResp.Body.String())
 
-		var conv map[string]interface{}
+		var conv ConversationTestResponse
 		parseResponse(t, createResp, &conv)
-		require.Equal(t, "group", conv["type"])
-		require.Equal(t, "Test Group", conv["name"])
+		require.Equal(t, "group", conv.Type)
+		require.Equal(t, "Test Group", conv.Name)
+
+		// Verify group appears in all members' conversation lists
+		for name, tok := range map[string]string{"alice": aliceToken, "bob": bobToken, "charlie": charlieToken} {
+			listResp := s.doRequest("GET", "/api/conversations", nil, tok)
+			require.Equal(t, http.StatusOK, listResp.Code)
+			var convs []ConversationTestResponse
+			parseResponse(t, listResp, &convs)
+			groupFound := false
+			for _, c := range convs {
+				if c.Name == "Test Group" && c.Type == "group" {
+					groupFound = true
+					break
+				}
+			}
+			require.True(t, groupFound, "%s should see the group in their conversations", name)
+		}
+
+		// Send a group message
+		sendResp := s.doRequest("POST", "/api/conversations/"+conv.ID.String()+"/messages", map[string]interface{}{
+			"content": "Welcome to the group!",
+		}, aliceToken)
+		require.Equal(t, http.StatusCreated, sendResp.Code, "send group message failed: %s", sendResp.Body.String())
+
+		// Bob sends a message in the group
+		sendResp2 := s.doRequest("POST", "/api/conversations/"+conv.ID.String()+"/messages", map[string]interface{}{
+			"content": "Thanks Alice!",
+		}, bobToken)
+		require.Equal(t, http.StatusCreated, sendResp2.Code)
+
+		// List all messages in the group
+		listMsgResp := s.doRequest("GET", "/api/conversations/"+conv.ID.String()+"/messages", nil, aliceToken)
+		require.Equal(t, http.StatusOK, listMsgResp.Code)
+		var msgs []MessageTestResponse
+		parseResponse(t, listMsgResp, &msgs)
+		require.GreaterOrEqual(t, len(msgs), 2, "expected at least 2 messages in group")
 	})
 
 	t.Run("list messages validation", func(t *testing.T) {
 		// Send empty content should fail
-		sendResp := s.doRequest("POST", "/api/conversations/"+uuid.New().String()+"/messages", map[string]interface{}{
+		sendResp := s.doRequest("POST", "/api/conversations/"+existingConvID+"/messages", map[string]interface{}{
 			"content": "",
 		}, aliceToken)
 		require.Equal(t, http.StatusBadRequest, sendResp.Code)
