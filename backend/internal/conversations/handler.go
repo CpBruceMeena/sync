@@ -16,6 +16,16 @@ func NewHandler(svc *Service) *Handler {
 }
 
 // ListConversations returns all conversations for the authenticated user
+// @Summary List conversations
+// @Description Get all conversations (private and group) for the authenticated user
+// @Tags conversations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} ConversationResponse
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/conversations [get]
 func (h *Handler) ListConversations(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(uuid.UUID)
 
@@ -30,6 +40,17 @@ func (h *Handler) ListConversations(w http.ResponseWriter, r *http.Request) {
 }
 
 // CreateConversation creates a new conversation
+// @Summary Create conversation
+// @Description Create a new private or group conversation
+// @Tags conversations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 201 {object} ConversationResponse
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/conversations [post]
 func (h *Handler) CreateConversation(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(uuid.UUID)
 
@@ -85,6 +106,19 @@ func (h *Handler) CreateConversation(w http.ResponseWriter, r *http.Request) {
 }
 
 // AddMember adds a member to a group conversation
+// @Summary Add member
+// @Description Add a user to a group conversation
+// @Tags conversations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Conversation ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/conversations/{id}/members [post]
 func (h *Handler) AddMember(w http.ResponseWriter, r *http.Request) {
 	convIDStr := chi.URLParam(r, "id")
 	convID, err := uuid.Parse(convIDStr)
@@ -109,6 +143,19 @@ func (h *Handler) AddMember(w http.ResponseWriter, r *http.Request) {
 }
 
 // RemoveMember removes a member from a group conversation
+// @Summary Remove member
+// @Description Remove a user from a group conversation
+// @Tags conversations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Conversation ID"
+// @Param userId path string true "User ID to remove"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/conversations/{id}/members/{userId} [delete]
 func (h *Handler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 	convIDStr := chi.URLParam(r, "id")
 	convID, err := uuid.Parse(convIDStr)
@@ -134,6 +181,18 @@ func (h *Handler) RemoveMember(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetConversation returns a specific conversation by ID
+// @Summary Get conversation
+// @Description Get a conversation by its ID
+// @Tags conversations
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Conversation ID"
+// @Success 200 {object} ConversationResponse
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 404 {object} map[string]string
+// @Router /api/conversations/{id} [get]
 func (h *Handler) GetConversation(w http.ResponseWriter, r *http.Request) {
 	convIDStr := chi.URLParam(r, "id")
 	convID, err := uuid.Parse(convIDStr)

@@ -16,15 +16,16 @@ func NewHandler(svc *Service) *Handler {
 }
 
 // ListNotifications returns all notifications for the authenticated user
-//
-// swagger:route GET /api/notifications notifications listNotifications
-//
-// Returns paginated notifications for the authenticated user.
-//
-// Responses:
-//
-//	200: []NotificationResponse
-//	401: ErrorResponse
+// @Summary List notifications
+// @Description Get paginated notifications for the authenticated user
+// @Tags notifications
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param limit query int false "Number of notifications to return"
+// @Success 200 {array} NotificationResponse
+// @Failure 401 {object} map[string]string
+// @Router /api/notifications [get]
 func (h *Handler) ListNotifications(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(uuid.UUID)
 
@@ -47,16 +48,17 @@ func (h *Handler) ListNotifications(w http.ResponseWriter, r *http.Request) {
 }
 
 // MarkRead marks a single notification as read
-//
-// swagger:route PUT /api/notifications/{id}/read notifications markNotificationRead
-//
-// Marks a specific notification as read.
-//
-// Responses:
-//
-//	200: map[string]string
-//	400: ErrorResponse
-//	401: ErrorResponse
+// @Summary Mark notification as read
+// @Description Marks a specific notification as read
+// @Tags notifications
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Notification ID"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Router /api/notifications/{id}/read [put]
 func (h *Handler) MarkRead(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(uuid.UUID)
 
@@ -77,15 +79,15 @@ func (h *Handler) MarkRead(w http.ResponseWriter, r *http.Request) {
 }
 
 // MarkAllRead marks all notifications as read for the authenticated user
-//
-// swagger:route PUT /api/notifications/read-all notifications markAllNotificationsRead
-//
-// Marks all notifications as read.
-//
-// Responses:
-//
-//	200: map[string]string
-//	401: ErrorResponse
+// @Summary Mark all notifications as read
+// @Description Marks all notifications as read
+// @Tags notifications
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Router /api/notifications/read-all [put]
 func (h *Handler) MarkAllRead(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(uuid.UUID)
 
@@ -99,15 +101,15 @@ func (h *Handler) MarkAllRead(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetUnreadCount returns the unread notification count for the authenticated user
-//
-// swagger:route GET /api/notifications/unread-count notifications getUnreadCount
-//
-// Returns the number of unread notifications.
-//
-// Responses:
-//
-//	200: UnreadCountResponse
-//	401: ErrorResponse
+// @Summary Get unread notification count
+// @Description Returns the number of unread notifications
+// @Tags notifications
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} map[string]int64
+// @Failure 401 {object} map[string]string
+// @Router /api/notifications/unread-count [get]
 func (h *Handler) GetUnreadCount(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(uuid.UUID)
 

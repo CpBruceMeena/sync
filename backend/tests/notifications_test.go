@@ -7,36 +7,15 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/CpBruceMeena/sync/internal/models"
 	"github.com/CpBruceMeena/sync/internal/notifications"
-	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
 // --- Notification Handler Tests ---
 
-func newMockNotifRepos() *repository.Repositories {
-	return &repository.Repositories{
-		Notifications: &mockNotifRepo{
-			listFn: func(ctx context.Context, userID uuid.UUID, limit int) ([]models.Notification, error) {
-				return nil, nil
-			},
-			getUnreadCountFn: func(ctx context.Context, userID uuid.UUID) (int64, error) {
-				return 0, nil
-			},
-			markReadFn: func(ctx context.Context, id, userID uuid.UUID) error {
-				return nil
-			},
-			markAllReadFn: func(ctx context.Context, userID uuid.UUID) error {
-				return nil
-			},
-		},
-	}
-}
-
 func TestNotificationsHandler_ListNotifications(t *testing.T) {
-	svc := notifications.NewService(newMockNotifRepos())
+	svc := notifications.NewService(newMockRepos())
 	h := notifications.NewHandler(svc)
 
 	req := httptest.NewRequest("GET", "/api/notifications", nil)
@@ -56,7 +35,7 @@ func TestNotificationsHandler_ListNotifications(t *testing.T) {
 }
 
 func TestNotificationsHandler_GetUnreadCount(t *testing.T) {
-	svc := notifications.NewService(newMockNotifRepos())
+	svc := notifications.NewService(newMockRepos())
 	h := notifications.NewHandler(svc)
 
 	req := httptest.NewRequest("GET", "/api/notifications/unread-count", nil)
@@ -81,7 +60,7 @@ func TestNotificationsHandler_GetUnreadCount(t *testing.T) {
 }
 
 func TestNotificationsHandler_MarkRead(t *testing.T) {
-	svc := notifications.NewService(newMockNotifRepos())
+	svc := notifications.NewService(newMockRepos())
 	h := notifications.NewHandler(svc)
 
 	req := httptest.NewRequest("PUT", "/api/notifications/"+uuid.New().String()+"/read", nil)
@@ -98,7 +77,7 @@ func TestNotificationsHandler_MarkRead(t *testing.T) {
 }
 
 func TestNotificationsHandler_MarkAllRead(t *testing.T) {
-	svc := notifications.NewService(newMockNotifRepos())
+	svc := notifications.NewService(newMockRepos())
 	h := notifications.NewHandler(svc)
 
 	req := httptest.NewRequest("PUT", "/api/notifications/read-all", nil)
@@ -113,7 +92,7 @@ func TestNotificationsHandler_MarkAllRead(t *testing.T) {
 }
 
 func TestNotificationsHandler_MarkReadInvalidID(t *testing.T) {
-	svc := notifications.NewService(newMockNotifRepos())
+	svc := notifications.NewService(newMockRepos())
 	h := notifications.NewHandler(svc)
 
 	req := httptest.NewRequest("PUT", "/api/notifications/invalid/read", nil)
