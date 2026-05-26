@@ -106,10 +106,10 @@ export const api = {
       }`
     ),
 
-  sendMessage: (conversationId: string, content: string, type = "text") =>
+  sendMessage: (conversationId: string, content: string, type = "text", attachment?: import("../types").Attachment) =>
     request<import("../types").Message>(`/api/conversations/${conversationId}/messages`, {
       method: "POST",
-      body: JSON.stringify({ content, type }),
+      body: JSON.stringify({ content, type, attachment }),
     }),
 
   deleteMessage: (id: string) =>

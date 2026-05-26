@@ -58,20 +58,11 @@ func (h *Handler) UploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Save file and create attachment record
+	// Save file to disk
 	attachment, err := h.service.SaveFile(r.Context(), file, header)
 	if err != nil {
 		log.Printf("Error saving file: %v", err)
 		httputil.RespondError(w, http.StatusInternalServerError, "Failed to save file")
-		return
-	}
-
-	// Save attachment record to database
-	if err := h.service.CreateAttachmentRecord(r.Context(), attachment); err != nil {
-		log.Printf("Error saving attachment record: %v", err)
-		// Try to clean up the file
-		os.Remove(h.service.GetFilePath(attachment.FileUrl))
-		httputil.RespondError(w, http.StatusInternalServerError, "Failed to save attachment record")
 		return
 	}
 

@@ -98,7 +98,7 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg, err := h.service.SendMessage(r.Context(), senderID, convID, req.Content, req.Type)
+	msg, err := h.service.SendMessage(r.Context(), senderID, convID, req.Content, req.Type, req.Attachment)
 	if err != nil {
 		log.Printf("Error creating message: %v", err)
 		httputil.RespondError(w, http.StatusInternalServerError, "Failed to send message")

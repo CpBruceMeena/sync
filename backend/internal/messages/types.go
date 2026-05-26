@@ -38,8 +38,17 @@ type AttachmentResponse struct {
 	FileSize int64     `json:"file_size"`
 }
 
+// AttachmentUpload represents attachment data sent with a message
+type AttachmentUpload struct {
+	FileURL  string `json:"file_url"`
+	FileType string `json:"file_type"`
+	FileName string `json:"file_name"`
+	FileSize int64  `json:"file_size"`
+}
+
 // SendMessageRequest represents a send message request body
 type SendMessageRequest struct {
-	Content string `json:"content"`
-	Type    string `json:"type"`
+	Content    string            `json:"content"`
+	Type       string            `json:"type"`
+	Attachment *AttachmentUpload `json:"attachment,omitempty"`
 }

@@ -57,6 +57,7 @@ func SetupRoutes(
 
 	// Public routes (no auth required)
 	registerPublicAuthRoutes(r, authHandler)
+	registerPublicFileRoutes(r, fileHandler)
 
 	// Protected routes (auth required)
 	r.Group(func(r chi.Router) {

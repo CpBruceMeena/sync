@@ -159,11 +159,18 @@ export default function ChatPage() {
       try {
         const result = await api.uploadFile(selectedConv.id, file);
 
-        // Send a text message with the file reference
+        // Send a file-type message with the attachment metadata
         const msg = await api.sendMessage(
           selectedConv.id,
           `Sent a file: ${file.name}`,
-          "file"
+          "file",
+          {
+            id: result.id,
+            file_url: result.file_url,
+            file_type: result.file_type,
+            file_name: result.file_name,
+            file_size: result.file_size,
+          }
         );
 
         const updatedMsg: Message = {
