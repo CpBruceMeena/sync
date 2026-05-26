@@ -102,3 +102,4 @@ medium-article.md
 
 # Go vendor (go.mod manages dependencies)
 vendor/
+.gstack/
