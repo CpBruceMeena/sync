@@ -62,6 +62,17 @@ func (r *userRepository) List(ctx context.Context) ([]models.User, error) {
 	return users, err
 }
 
+func (r *userRepository) Search(ctx context.Context, query string, limit int) ([]models.User, error) {
+	var users []models.User
+	pattern := "%" + query + "%"
+	err := r.db.WithContext(ctx).
+		Where("username ILIKE ? OR display_name ILIKE ? OR email ILIKE ?", pattern, pattern, pattern).
+		Order("username ASC").
+		Limit(limit).
+		Find(&users).Error
+	return users, err
+}
+
 func (r *userRepository) Update(ctx context.Context, user *models.User) error {
 	return r.db.WithContext(ctx).Save(user).Error
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/CpBruceMeena/sync/internal/api"
 	"github.com/CpBruceMeena/sync/internal/auth"
 	"github.com/CpBruceMeena/sync/internal/conversations"
+	"github.com/CpBruceMeena/sync/internal/discovery"
 	"github.com/CpBruceMeena/sync/internal/files"
 	"github.com/CpBruceMeena/sync/internal/messages"
 	"github.com/CpBruceMeena/sync/internal/models"
@@ -287,7 +288,11 @@ func newMockE2ESuite() *mockE2ESuite {
 	fileSvc := files.NewService(s.repos, "./uploads")
 	fileHandler := files.NewHandler(fileSvc, "./uploads")
 
-	s.mux = api.SetupRoutes(authHandler, usersHandler, convsHandler, msgsHandler, reactionsHandler, notifHandler, fileHandler, wsHandler, s.authSvc)
+	// Discovery
+	discoverySvc := discovery.NewService(s.repos)
+	discoveryHandler := discovery.NewHandler(discoverySvc)
+
+	s.mux = api.SetupRoutes(authHandler, usersHandler, convsHandler, msgsHandler, reactionsHandler, notifHandler, fileHandler, wsHandler, s.authSvc, discoveryHandler)
 
 	return s
 }

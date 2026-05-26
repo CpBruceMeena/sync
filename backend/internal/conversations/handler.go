@@ -95,7 +95,7 @@ func (h *Handler) CreateConversation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conv, err = h.service.CreateGroupConversation(r.Context(), userID, req.Name, req.Members)
+	conv, err = h.service.CreateGroupConversation(r.Context(), userID, req.Name, req.Members, req.IsPublic)
 	if err != nil {
 		log.Printf("Error creating group: %v", err)
 		httputil.RespondError(w, http.StatusInternalServerError, "Failed to create group")

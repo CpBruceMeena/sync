@@ -104,3 +104,6 @@ vendor/
 
 # Test credentials (plaintext passwords, never commit)
 backend/scripts/test-credentials.txt
+
+# Headroom memory database
+headroom_memory.db

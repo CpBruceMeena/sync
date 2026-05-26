@@ -15,6 +15,7 @@ type UserRepository interface {
 	GetByEmailWithPassword(ctx context.Context, email string) (*models.User, error)
 	GetByUsername(ctx context.Context, username string) (*models.User, error)
 	List(ctx context.Context) ([]models.User, error)
+	Search(ctx context.Context, query string, limit int) ([]models.User, error)
 	Update(ctx context.Context, user *models.User) error
 	UpdatePassword(ctx context.Context, id uuid.UUID, passwordHash string) error
 	UpdateStatus(ctx context.Context, id uuid.UUID, status string) error
@@ -26,6 +27,8 @@ type ConversationRepository interface {
 	Create(ctx context.Context, conv *models.Conversation) error
 	GetByID(ctx context.Context, id uuid.UUID) (*models.Conversation, error)
 	ListByUserID(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error)
+	ListPublic(ctx context.Context, limit, offset int) ([]models.Conversation, error)
+	SearchPublic(ctx context.Context, query string, limit int) ([]models.Conversation, error)
 	FindPrivate(ctx context.Context, userID1, userID2 uuid.UUID) (*models.Conversation, error)
 	AddMember(ctx context.Context, member *models.ConversationMember) error
 	RemoveMember(ctx context.Context, convID, userID uuid.UUID) error

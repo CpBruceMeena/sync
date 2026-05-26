@@ -11,6 +11,7 @@ type Conversation struct {
 	Type      string     `gorm:"not null;size:20" json:"type"`
 	Name      string     `gorm:"size:200" json:"name"`
 	AdminID   *uuid.UUID `gorm:"type:uuid;column:admin_id" json:"admin_id"`
+	IsPublic  bool       `gorm:"column:is_public;not null;default:false" json:"is_public"`
 	CreatedAt time.Time  `json:"created_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 }

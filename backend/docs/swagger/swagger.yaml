@@ -59,6 +59,8 @@ definitions:
         type: string
       id:
         type: string
+      is_public:
+        type: boolean
       last_message_at:
         type: string
       last_message_content:
@@ -81,6 +83,49 @@ definitions:
       role:
         type: string
       user_id:
+        type: string
+      username:
+        type: string
+    type: object
+  discovery.GroupDetailResponse:
+    properties:
+      admin_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      member_count:
+        type: integer
+      members:
+        items:
+          $ref: '#/definitions/discovery.GroupMemberResponse'
+        type: array
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  discovery.GroupMemberResponse:
+    properties:
+      joined_at:
+        type: string
+      role:
+        type: string
+      user_id:
+        type: string
+      username:
+        type: string
+    type: object
+  discovery.UserResult:
+    properties:
+      avatar_url:
+        type: string
+      display_name:
+        type: string
+      id:
+        type: string
+      status:
         type: string
       username:
         type: string
@@ -587,6 +632,157 @@ paths:
       summary: Send message
       tags:
       - messages
+  /api/discovery/groups:
+    get:
+      consumes:
+      - application/json
+      description: List all public groups with pagination
+      parameters:
+      - description: Results per page (default 20, max 50)
+        in: query
+        name: limit
+        type: integer
+      - description: Offset for pagination (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/discovery.GroupDetailResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List public groups
+      tags:
+      - discovery
+  /api/discovery/groups/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a public group
+      parameters:
+      - description: Group conversation ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/discovery.GroupDetailResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get group details
+      tags:
+      - discovery
+  /api/discovery/groups/search:
+    get:
+      consumes:
+      - application/json
+      description: Search for public groups by name
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Max results (default 20, max 50)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/discovery.GroupDetailResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Search public groups
+      tags:
+      - discovery
+  /api/discovery/users:
+    get:
+      consumes:
+      - application/json
+      description: Search for users by username, display name, or email
+      parameters:
+      - description: Search query
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Max results (default 20, max 50)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/discovery.UserResult'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Search users
+      tags:
+      - discovery
   /api/files/{filename}:
     get:
       description: Retrieve an uploaded file by filename

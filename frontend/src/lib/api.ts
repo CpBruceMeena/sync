@@ -79,7 +79,7 @@ export const api = {
   getConversations: () =>
     request<import("../types").Conversation[]>("/api/conversations"),
 
-  createConversation: (data: { type: string; name?: string; members: string[] }) =>
+  createConversation: (data: { type: string; name?: string; members: string[]; is_public?: boolean }) =>
     request<import("../types").Conversation>("/api/conversations", {
       method: "POST",
       body: JSON.stringify(data),
@@ -161,4 +161,17 @@ export const api = {
   },
 
   getFileUrl: (filename: string) => `${API_BASE}/api/files/${filename}`,
+
+  // Discovery
+  searchUsers: (q: string, limit = 20) =>
+    request<import("../types").UserResult[]>(`/api/discovery/users?q=${encodeURIComponent(q)}&limit=${limit}`),
+
+  listPublicGroups: (limit = 20, offset = 0) =>
+    request<import("../types").GroupDetail[]>(`/api/discovery/groups?limit=${limit}&offset=${offset}`),
+
+  searchPublicGroups: (q: string, limit = 20) =>
+    request<import("../types").GroupDetail[]>(`/api/discovery/groups/search?q=${encodeURIComponent(q)}&limit=${limit}`),
+
+  getGroupDetails: (id: string) =>
+    request<import("../types").GroupDetail>(`/api/discovery/groups/${id}`),
 };

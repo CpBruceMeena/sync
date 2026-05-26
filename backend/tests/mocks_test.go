@@ -24,6 +24,7 @@ type mockUserRepo struct {
 	updatePasswordFn         func(ctx context.Context, id uuid.UUID, passwordHash string) error
 	updateStatusFn           func(ctx context.Context, id uuid.UUID, status string) error
 	deleteFn                 func(ctx context.Context, id uuid.UUID) error
+	searchFn                 func(ctx context.Context, query string, limit int) ([]models.User, error)
 }
 
 func (m *mockUserRepo) Create(ctx context.Context, user *models.User) error {
@@ -86,11 +87,19 @@ func (m *mockUserRepo) Delete(ctx context.Context, id uuid.UUID) error {
 	}
 	return nil
 }
+func (m *mockUserRepo) Search(ctx context.Context, query string, limit int) ([]models.User, error) {
+	if m.searchFn != nil {
+		return m.searchFn(ctx, query, limit)
+	}
+	return nil, nil
+}
 
 type mockConvRepo struct {
 	createFn       func(ctx context.Context, conv *models.Conversation) error
 	getByIDFn      func(ctx context.Context, id uuid.UUID) (*models.Conversation, error)
 	listByUserIDFn func(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error)
+	listPublicFn   func(ctx context.Context, limit, offset int) ([]models.Conversation, error)
+	searchPublicFn func(ctx context.Context, query string, limit int) ([]models.Conversation, error)
 	findPrivateFn  func(ctx context.Context, userID1, userID2 uuid.UUID) (*models.Conversation, error)
 	addMemberFn    func(ctx context.Context, member *models.ConversationMember) error
 	removeMemberFn func(ctx context.Context, convID, userID uuid.UUID) error
@@ -114,6 +123,18 @@ func (m *mockConvRepo) GetByID(ctx context.Context, id uuid.UUID) (*models.Conve
 func (m *mockConvRepo) ListByUserID(ctx context.Context, userID uuid.UUID) ([]models.Conversation, error) {
 	if m.listByUserIDFn != nil {
 		return m.listByUserIDFn(ctx, userID)
+	}
+	return nil, nil
+}
+func (m *mockConvRepo) ListPublic(ctx context.Context, limit, offset int) ([]models.Conversation, error) {
+	if m.listPublicFn != nil {
+		return m.listPublicFn(ctx, limit, offset)
+	}
+	return nil, nil
+}
+func (m *mockConvRepo) SearchPublic(ctx context.Context, query string, limit int) ([]models.Conversation, error) {
+	if m.searchPublicFn != nil {
+		return m.searchPublicFn(ctx, query, limit)
 	}
 	return nil, nil
 }

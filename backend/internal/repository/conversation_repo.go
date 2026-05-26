@@ -40,6 +40,28 @@ func (r *conversationRepository) ListByUserID(ctx context.Context, userID uuid.U
 	return convs, err
 }
 
+func (r *conversationRepository) ListPublic(ctx context.Context, limit, offset int) ([]models.Conversation, error) {
+	var convs []models.Conversation
+	err := r.db.WithContext(ctx).
+		Where("type = 'group' AND is_public = ?", true).
+		Order("updated_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&convs).Error
+	return convs, err
+}
+
+func (r *conversationRepository) SearchPublic(ctx context.Context, query string, limit int) ([]models.Conversation, error) {
+	var convs []models.Conversation
+	pattern := "%" + query + "%"
+	err := r.db.WithContext(ctx).
+		Where("type = 'group' AND is_public = ? AND name ILIKE ?", true, pattern).
+		Order("updated_at DESC").
+		Limit(limit).
+		Find(&convs).Error
+	return convs, err
+}
+
 func (r *conversationRepository) FindPrivate(ctx context.Context, userID1, userID2 uuid.UUID) (*models.Conversation, error) {
 	var conv models.Conversation
 	err := r.db.WithContext(ctx).

@@ -7,7 +7,7 @@ import type { User } from "@/types";
 
 interface CreateGroupDialogProps {
   onClose: () => void;
-  onCreate: (name: string, members: string[]) => void;
+  onCreate: (name: string, members: string[], isPublic: boolean) => void;
 }
 
 export function CreateGroupDialog({
@@ -18,6 +18,7 @@ export function CreateGroupDialog({
   const [searchTerm, setSearchTerm] = useState("");
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUsers, setSelectedUsers] = useState<Set<string>>(new Set());
+  const [isPublic, setIsPublic] = useState(false);
   const [loading, setLoading] = useState(true);
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -57,7 +58,7 @@ export function CreateGroupDialog({
 
   const handleCreate = () => {
     if (!groupName.trim() || selectedUsers.size === 0) return;
-    onCreate(groupName.trim(), Array.from(selectedUsers));
+    onCreate(groupName.trim(), Array.from(selectedUsers), isPublic);
   };
 
   const filteredUsers = users.filter(
@@ -95,6 +96,25 @@ export function CreateGroupDialog({
             placeholder="Group name"
             className="w-full px-4 py-2.5 rounded-lg bg-[var(--surface-2)] border border-[var(--border)] text-[var(--foreground)] placeholder:text-[var(--text-muted)] focus:outline-none focus:border-[var(--primary)] transition-colors"
           />
+
+          {/* is_public toggle */}
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div
+              onClick={() => setIsPublic(!isPublic)}
+              className={`relative w-10 h-5 rounded-full transition-colors ${
+                isPublic ? "bg-[var(--primary)]" : "bg-[var(--surface-3)]"
+              }`}
+            >
+              <div
+                className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${
+                  isPublic ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </div>
+            <span className="text-sm text-[var(--foreground)]">
+              Make this group public (discoverable by anyone)
+            </span>
+          </label>
 
           {/* Selected users */}
           {selectedUsers.size > 0 && (

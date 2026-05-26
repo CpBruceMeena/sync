@@ -9,6 +9,7 @@ import { useSelectedConv } from "@/contexts/SelectedConvContext";
 import { CreateGroupDialog } from "./CreateGroupDialog";
 import { NotificationBadge } from "./NotificationBadge";
 import type { Conversation } from "@/types";
+import { DiscoveryDialog } from "./DiscoveryDialog";
 
 export function Sidebar() {
   const { user, logout } = useAuth();
@@ -17,6 +18,7 @@ export function Sidebar() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [showDiscovery, setShowDiscovery] = useState(false);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,13 +31,15 @@ export function Sidebar() {
 
   const handleCreateGroup = async (
     name: string,
-    members: string[]
+    members: string[],
+    isPublic: boolean
   ) => {
     try {
       const conv = await api.createConversation({
         type: "group",
         name,
         members,
+        is_public: isPublic,
       });
       setConversations((prev) => [conv, ...prev]);
       setShowCreateGroup(false);
@@ -66,6 +70,15 @@ export function Sidebar() {
               </span>
             </div>
             <div className="flex items-center gap-1">
+              <button
+                onClick={() => setShowDiscovery(true)}
+                className="p-1.5 rounded-lg hover:bg-[var(--surface-3)] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"
+                title="Discover users and groups"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
               <NotificationBadge />
               <span
                 className={`w-2 h-2 rounded-full ${
@@ -221,6 +234,12 @@ export function Sidebar() {
         <CreateGroupDialog
           onClose={() => setShowCreateGroup(false)}
           onCreate={handleCreateGroup}
+        />
+      )}
+
+      {showDiscovery && (
+        <DiscoveryDialog
+          onClose={() => setShowDiscovery(false)}
         />
       )}
     </>
