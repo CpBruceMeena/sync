@@ -20,6 +20,7 @@ const (
 	TypeReactionRemoved = "reaction_removed"
 	TypeError           = "error"
 	TypeOnlineUsers     = "online_users"
+	TypeNotification    = "notification"
 )
 
 // WsHandler handles WebSocket upgrade requests

@@ -10,7 +10,7 @@ import (
 
 	"github.com/CpBruceMeena/sync/internal/auth"
 	"github.com/CpBruceMeena/sync/internal/conversations"
-	"github.com/CpBruceMeena/sync/internal/messages"
+	messages "github.com/CpBruceMeena/sync/internal/messages"
 	"github.com/CpBruceMeena/sync/internal/models"
 	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/CpBruceMeena/sync/internal/users"
@@ -409,7 +409,7 @@ func TestUsersHandler_ListUsers(t *testing.T) {
 // --- Message Handler Tests ---
 
 func TestMessagesHandler_SendMessageValidation(t *testing.T) {
-	h := messages.NewHandler(messages.NewService(newMockRepos()))
+	h := messages.NewHandler(messages.NewService(newMockRepos(), nil))
 
 	tests := []struct {
 		name       string
@@ -439,7 +439,7 @@ func TestMessagesHandler_SendMessageValidation(t *testing.T) {
 // --- Conversation Handler Tests ---
 
 func TestConversationsHandler_CreateConversationValidation(t *testing.T) {
-	h := conversations.NewHandler(conversations.NewService(newMockRepos()))
+	h := conversations.NewHandler(conversations.NewService(newMockRepos(), nil))
 
 	tests := []struct {
 		name       string

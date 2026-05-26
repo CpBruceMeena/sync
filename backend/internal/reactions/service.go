@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/CpBruceMeena/sync/internal/models"
+	"github.com/CpBruceMeena/sync/internal/notifications"
 	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/CpBruceMeena/sync/internal/websocket"
 	"github.com/google/uuid"
@@ -13,13 +14,14 @@ import (
 
 // Service handles reaction business logic
 type Service struct {
-	repos *repository.Repositories
-	hub   *websocket.Hub
+	repos        *repository.Repositories
+	hub          *websocket.Hub
+	notifService *notifications.Service
 }
 
 // NewService creates a new reaction service
-func NewService(repos *repository.Repositories, hub *websocket.Hub) *Service {
-	return &Service{repos: repos, hub: hub}
+func NewService(repos *repository.Repositories, hub *websocket.Hub, notifService *notifications.Service) *Service {
+	return &Service{repos: repos, hub: hub, notifService: notifService}
 }
 
 // ToggleReaction adds a reaction if not present, removes if present, fetches updated
@@ -61,6 +63,15 @@ func (s *Service) ToggleReaction(ctx context.Context, msgID, userID uuid.UUID, u
 			return nil, err
 		}
 		wsEventType = websocket.TypeReactionAdded
+
+		// Notify the message author about the reaction (if not reacting to own message)
+		if s.notifService != nil && msg.SenderID != userID {
+			content := username + " reacted with " + emoji + " to your message"
+			refID := msgID
+			if err := s.notifService.CreateNotification(ctx, msg.SenderID, notifications.TypeReaction, &refID, content); err != nil {
+				log.Printf("Error creating reaction notification: %v", err)
+			}
+		}
 	}
 
 	// Fetch updated reactions with usernames

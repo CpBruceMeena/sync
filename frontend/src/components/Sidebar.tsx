@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useWebSocket } from "@/contexts/WebSocketContext";
 import { useSelectedConv } from "@/contexts/SelectedConvContext";
 import { CreateGroupDialog } from "./CreateGroupDialog";
+import { NotificationBadge } from "./NotificationBadge";
 import type { Conversation } from "@/types";
 
 export function Sidebar() {
@@ -65,6 +66,7 @@ export function Sidebar() {
               </span>
             </div>
             <div className="flex items-center gap-1">
+              <NotificationBadge />
               <span
                 className={`w-2 h-2 rounded-full ${
                   isConnected

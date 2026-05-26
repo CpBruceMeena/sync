@@ -69,3 +69,12 @@ export interface WSMessage {
   error?: string;
   data?: any;
 }
+
+export interface Notification {
+  id: string;
+  type: "new_message" | "reaction" | "group_invite";
+  reference_id?: string;
+  content: string;
+  is_read: boolean;
+  created_at: string;
+}

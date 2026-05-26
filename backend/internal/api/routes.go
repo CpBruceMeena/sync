@@ -7,6 +7,7 @@ import (
 	"github.com/CpBruceMeena/sync/internal/conversations"
 	"github.com/CpBruceMeena/sync/internal/messages"
 	"github.com/CpBruceMeena/sync/internal/middleware"
+	"github.com/CpBruceMeena/sync/internal/notifications"
 	"github.com/CpBruceMeena/sync/internal/reactions"
 	"github.com/CpBruceMeena/sync/internal/users"
 	"github.com/CpBruceMeena/sync/internal/websocket"
@@ -26,6 +27,7 @@ func SetupRoutes(
 	conversationsHandler *conversations.Handler,
 	messagesHandler *messages.Handler,
 	reactionsHandler *reactions.Handler,
+	notificationsHandler *notifications.Handler,
 	wsHandler *websocket.WsHandler,
 	authService *auth.Service,
 ) *chi.Mux {
@@ -61,6 +63,7 @@ func SetupRoutes(
 		registerProtectedAuthRoutes(r, authHandler)
 		registerUserRoutes(r, usersHandler)
 		registerConversationRoutes(r, conversationsHandler, messagesHandler, reactionsHandler)
+		registerNotificationRoutes(r, notificationsHandler)
 	})
 
 	// Swagger documentation

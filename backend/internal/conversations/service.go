@@ -2,21 +2,24 @@ package conversations
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/CpBruceMeena/sync/internal/models"
+	"github.com/CpBruceMeena/sync/internal/notifications"
 	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/google/uuid"
 )
 
 // Service handles conversation business logic
 type Service struct {
-	repos *repository.Repositories
+	repos        *repository.Repositories
+	notifService *notifications.Service
 }
 
 // NewService creates a new conversation service
-func NewService(repos *repository.Repositories) *Service {
-	return &Service{repos: repos}
+func NewService(repos *repository.Repositories, notifService *notifications.Service) *Service {
+	return &Service{repos: repos, notifService: notifService}
 }
 
 // ListConversations returns all conversations for a user with member and message info
@@ -121,18 +124,34 @@ func (s *Service) CreateGroupConversation(ctx context.Context, userID uuid.UUID,
 	return &resp, nil
 }
 
-// AddMember adds a user to a conversation by username
+// AddMember adds a user to a conversation by username and sends a notification
 func (s *Service) AddMember(ctx context.Context, convID uuid.UUID, username string) error {
 	user, err := s.repos.Users.GetByUsername(ctx, username)
 	if err != nil {
 		return err
 	}
 
-	return s.repos.Conversations.AddMember(ctx, &models.ConversationMember{
+	if err := s.repos.Conversations.AddMember(ctx, &models.ConversationMember{
 		ConversationID: convID,
 		UserID:         user.ID,
 		Role:           "member",
-	})
+	}); err != nil {
+		return err
+	}
+
+	// Send notification to the new member
+	if s.notifService != nil {
+		conv, err := s.repos.Conversations.GetByID(ctx, convID)
+		if err == nil && conv != nil {
+			content := "You were added to " + conv.Name
+			refID := convID
+			if err := s.notifService.CreateNotification(ctx, user.ID, notifications.TypeGroupInvite, &refID, content); err != nil {
+				log.Printf("Error creating group invite notification: %v", err)
+			}
+		}
+	}
+
+	return nil
 }
 
 // RemoveMember removes a member from a conversation

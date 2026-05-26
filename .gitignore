@@ -56,8 +56,9 @@ backend/vendor/
 backend/sync
 backend/server
 backend/sql/
-# Root-level compiled Go binary
+# Root-level compiled Go binaries
 /server
+/sync
 # Screenshots
 screenshots/
 # Runtime PID files

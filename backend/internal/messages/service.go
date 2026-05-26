@@ -2,20 +2,23 @@ package messages
 
 import (
 	"context"
+	"log"
 
 	"github.com/CpBruceMeena/sync/internal/models"
+	"github.com/CpBruceMeena/sync/internal/notifications"
 	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/google/uuid"
 )
 
 // Service handles message business logic
 type Service struct {
-	repos *repository.Repositories
+	repos        *repository.Repositories
+	notifService *notifications.Service
 }
 
 // NewService creates a new message service
-func NewService(repos *repository.Repositories) *Service {
-	return &Service{repos: repos}
+func NewService(repos *repository.Repositories, notifService *notifications.Service) *Service {
+	return &Service{repos: repos, notifService: notifService}
 }
 
 // ListMessages returns paginated messages with sender info and reactions
@@ -64,7 +67,7 @@ func (s *Service) ListMessages(ctx context.Context, convID uuid.UUID, cursor uui
 	return response, nil
 }
 
-// SendMessage creates a new message
+// SendMessage creates a new message and sends notifications to conversation members
 func (s *Service) SendMessage(ctx context.Context, senderID uuid.UUID, convID uuid.UUID, content string, msgType string) (*models.Message, error) {
 	if msgType == "" {
 		msgType = "text"
@@ -79,7 +82,35 @@ func (s *Service) SendMessage(ctx context.Context, senderID uuid.UUID, convID uu
 	if err := s.repos.Messages.Create(ctx, msg); err != nil {
 		return nil, err
 	}
+
+	// Notify conversation members (except sender)
+	s.notifyMembers(ctx, senderID, convID, content)
+
 	return msg, nil
+}
+
+// notifyMembers sends notifications to all conversation members except the sender
+func (s *Service) notifyMembers(ctx context.Context, senderID, convID uuid.UUID, content string) {
+	if s.notifService == nil {
+		return
+	}
+
+	members, err := s.repos.Conversations.GetMembers(ctx, convID)
+	if err != nil {
+		log.Printf("Error fetching members for notification: %v", err)
+		return
+	}
+
+	for _, member := range members {
+		if member.UserID == senderID {
+			continue
+		}
+
+		refID := convID
+		if err := s.notifService.CreateNotification(ctx, member.UserID, notifications.TypeNewMessage, &refID, content); err != nil {
+			log.Printf("Error creating notification for user %s: %v", member.UserID, err)
+		}
+	}
 }
 
 // DeleteMessage deletes a message by ID

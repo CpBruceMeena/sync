@@ -17,6 +17,7 @@ import (
 	"github.com/CpBruceMeena/sync/internal/database"
 	"github.com/CpBruceMeena/sync/internal/messages"
 	"github.com/CpBruceMeena/sync/internal/models"
+	"github.com/CpBruceMeena/sync/internal/notifications"
 	"github.com/CpBruceMeena/sync/internal/reactions"
 	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/CpBruceMeena/sync/internal/users"
@@ -131,21 +132,23 @@ func setupE2E(t *testing.T) *e2eTestSuite {
 	s.authSvc = auth.NewService("test-jwt-secret-for-e2e", 60, 7)
 
 	userSvc := users.NewService(s.repos)
-	messageSvc := messages.NewService(s.repos)
-	conversationSvc := conversations.NewService(s.repos)
+	notifSvc := notifications.NewService(s.repos)
+	messageSvc := messages.NewService(s.repos, notifSvc)
+	conversationSvc := conversations.NewService(s.repos, notifSvc)
 
 	authHandler := auth.NewHandler(s.authSvc, s.repos)
 	usersHandler := users.NewHandler(userSvc)
 	convsHandler := conversations.NewHandler(conversationSvc)
 	msgsHandler := messages.NewHandler(messageSvc)
+	notifHandler := notifications.NewHandler(notifSvc)
 	wsHub := websocket.NewHub()
 	go wsHub.Run()
 	wsHandler := websocket.NewWsHandler(wsHub, s.authSvc, s.repos)
 
-	reactionSvc := reactions.NewService(s.repos, wsHub)
+	reactionSvc := reactions.NewService(s.repos, wsHub, notifSvc)
 	reactionsHandler := reactions.NewHandler(reactionSvc)
 
-	s.mux = api.SetupRoutes(authHandler, usersHandler, convsHandler, msgsHandler, reactionsHandler, wsHandler, s.authSvc)
+	s.mux = api.SetupRoutes(authHandler, usersHandler, convsHandler, msgsHandler, reactionsHandler, notifHandler, wsHandler, s.authSvc)
 	s.baseURL = "http://test"
 
 	return s

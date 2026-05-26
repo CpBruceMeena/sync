@@ -16,6 +16,7 @@ import (
 	"github.com/CpBruceMeena/sync/internal/conversations"
 	"github.com/CpBruceMeena/sync/internal/database"
 	"github.com/CpBruceMeena/sync/internal/messages"
+	"github.com/CpBruceMeena/sync/internal/notifications"
 	"github.com/CpBruceMeena/sync/internal/reactions"
 	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/CpBruceMeena/sync/internal/users"
@@ -36,21 +37,23 @@ func main() {
 	authService := auth.NewService(cfg.JWTSecret, cfg.AccessTTL, cfg.RefreshTTL)
 
 	// Create service layer
+	notifSvc := notifications.NewService(repos)
 	userSvc := users.NewService(repos)
-	messageSvc := messages.NewService(repos)
-	conversationSvc := conversations.NewService(repos)
+	messageSvc := messages.NewService(repos, notifSvc)
+	conversationSvc := conversations.NewService(repos, notifSvc)
 
 	// Create HTTP handlers
 	authHandler := auth.NewHandler(authService, repos)
 	usersHandler := users.NewHandler(userSvc)
 	conversationsHandler := conversations.NewHandler(conversationSvc)
 	messagesHandler := messages.NewHandler(messageSvc)
+	notifHandler := notifications.NewHandler(notifSvc)
 
 	wsHub := websocket.NewHub()
 	go wsHub.Run()
 	wsHandler := websocket.NewWsHandler(wsHub, authService, repos)
 
-	reactionSvc := reactions.NewService(repos, wsHub)
+	reactionSvc := reactions.NewService(repos, wsHub, notifSvc)
 	reactionsHandler := reactions.NewHandler(reactionSvc)
 
 	// All routes are defined in internal/api/routes.go
@@ -60,6 +63,7 @@ func main() {
 		conversationsHandler,
 		messagesHandler,
 		reactionsHandler,
+		notifHandler,
 		wsHandler,
 		authService,
 	)
