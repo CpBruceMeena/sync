@@ -11,13 +11,15 @@ import (
 
 // Message types sent between client and server
 const (
-	TypeNewMessage  = "new_message"
-	TypeTyping      = "typing"
-	TypeStopTyping  = "stop_typing"
-	TypePresence    = "presence"
-	TypeReadReceipt = "read_receipt"
-	TypeError       = "error"
-	TypeOnlineUsers = "online_users"
+	TypeNewMessage      = "new_message"
+	TypeTyping          = "typing"
+	TypeStopTyping      = "stop_typing"
+	TypePresence        = "presence"
+	TypeReadReceipt     = "read_receipt"
+	TypeReactionAdded   = "reaction_added"
+	TypeReactionRemoved = "reaction_removed"
+	TypeError           = "error"
+	TypeOnlineUsers     = "online_users"
 )
 
 // WsHandler handles WebSocket upgrade requests
@@ -39,6 +41,7 @@ type WSMessage struct {
 	Username       string      `json:"username,omitempty"`
 	Status         string      `json:"status,omitempty"`
 	IsTyping       bool        `json:"is_typing,omitempty"`
+	Emoji          string      `json:"emoji,omitempty"`
 	Error          string      `json:"error,omitempty"`
 	Data           interface{} `json:"data,omitempty"`
 }

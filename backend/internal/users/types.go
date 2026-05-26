@@ -1,13 +1,12 @@
 package users
 
 import (
-	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/google/uuid"
 )
 
 // Handler handles user HTTP requests
 type Handler struct {
-	repos *repository.Repositories
+	service *Service
 }
 
 // UserResponse represents a user in API responses
@@ -18,4 +17,11 @@ type UserResponse struct {
 	DisplayName string    `json:"display_name"`
 	AvatarURL   string    `json:"avatar_url"`
 	Status      string    `json:"status"`
+}
+
+// UpdateProfileRequest represents an update profile request body
+type UpdateProfileRequest struct {
+	DisplayName string `json:"display_name"`
+	AvatarURL   string `json:"avatar_url"`
+	Status      string `json:"status"`
 }

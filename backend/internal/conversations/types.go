@@ -3,13 +3,12 @@ package conversations
 import (
 	"time"
 
-	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/google/uuid"
 )
 
 // Handler handles conversation HTTP requests
 type Handler struct {
-	repos *repository.Repositories
+	service *Service
 }
 
 // ConversationResponse represents a conversation in API responses
@@ -31,4 +30,16 @@ type MemberResponse struct {
 	Username string    `json:"username"`
 	Role     string    `json:"role"`
 	JoinedAt time.Time `json:"joined_at"`
+}
+
+// CreateConversationRequest represents a create conversation request body
+type CreateConversationRequest struct {
+	Type    string   `json:"type"`
+	Name    string   `json:"name"`
+	Members []string `json:"members"`
+}
+
+// AddMemberRequest represents an add member request body
+type AddMemberRequest struct {
+	Username string `json:"username"`
 }

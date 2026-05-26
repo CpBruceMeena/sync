@@ -167,6 +167,7 @@ type mockMsgRepo struct {
 	deleteFn         func(ctx context.Context, id, senderID uuid.UUID) error
 	addReactionFn    func(ctx context.Context, reaction *models.Reaction) error
 	removeReactionFn func(ctx context.Context, messageID, userID uuid.UUID, emoji string) error
+	getReactionsFn   func(ctx context.Context, messageID uuid.UUID) ([]models.Reaction, error)
 }
 
 func (m *mockMsgRepo) Create(ctx context.Context, msg *models.Message) error {
@@ -204,6 +205,12 @@ func (m *mockMsgRepo) RemoveReaction(ctx context.Context, messageID, userID uuid
 		return m.removeReactionFn(ctx, messageID, userID, emoji)
 	}
 	return nil
+}
+func (m *mockMsgRepo) GetReactionsByMessage(ctx context.Context, messageID uuid.UUID) ([]models.Reaction, error) {
+	if m.getReactionsFn != nil {
+		return m.getReactionsFn(ctx, messageID)
+	}
+	return nil, nil
 }
 
 type mockSessionRepo struct {
@@ -378,7 +385,7 @@ func TestUsersHandler_ListUsers(t *testing.T) {
 			}, nil
 		},
 	}
-	h := users.NewHandler(repos)
+	h := users.NewHandler(users.NewService(repos))
 
 	req := httptest.NewRequest("GET", "/api/users", nil)
 	req = req.WithContext(authContext(uuid.New()))
@@ -402,7 +409,7 @@ func TestUsersHandler_ListUsers(t *testing.T) {
 // --- Message Handler Tests ---
 
 func TestMessagesHandler_SendMessageValidation(t *testing.T) {
-	h := messages.NewHandler(newMockRepos())
+	h := messages.NewHandler(messages.NewService(newMockRepos()))
 
 	tests := []struct {
 		name       string
@@ -432,7 +439,7 @@ func TestMessagesHandler_SendMessageValidation(t *testing.T) {
 // --- Conversation Handler Tests ---
 
 func TestConversationsHandler_CreateConversationValidation(t *testing.T) {
-	h := conversations.NewHandler(newMockRepos())
+	h := conversations.NewHandler(conversations.NewService(newMockRepos()))
 
 	tests := []struct {
 		name       string

@@ -42,6 +42,7 @@ type MessageRepository interface {
 	Delete(ctx context.Context, id, senderID uuid.UUID) error
 	AddReaction(ctx context.Context, reaction *models.Reaction) error
 	RemoveReaction(ctx context.Context, messageID, userID uuid.UUID, emoji string) error
+	GetReactionsByMessage(ctx context.Context, messageID uuid.UUID) ([]models.Reaction, error)
 }
 
 // SessionRepository defines session data operations

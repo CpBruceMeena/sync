@@ -114,4 +114,14 @@ export const api = {
 
   deleteMessage: (id: string) =>
     request<void>(`/api/messages/${id}`, { method: "DELETE" }),
+
+  // Reactions
+  toggleReaction: (messageId: string, emoji: string) =>
+    request<{ reactions: import("../types").MessageReaction[] }>(
+      `/api/messages/${messageId}/reactions`,
+      {
+        method: "POST",
+        body: JSON.stringify({ emoji }),
+      }
+    ),
 };

@@ -7,7 +7,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useWebSocket } from "@/contexts/WebSocketContext";
 import { useSelectedConv } from "@/contexts/SelectedConvContext";
 import { MessageInput } from "@/components/MessageInput";
-import type { Message, WSMessage } from "@/types";
+import { ReactionPicker } from "@/components/ReactionPicker";
+import type { Message, MessageReaction, WSMessage } from "@/types";
 
 export default function ChatPage() {
   const { user } = useAuth();
@@ -49,6 +50,49 @@ export default function ChatPage() {
 
     return unsub;
   }, [selectedConv, subscribe]);
+
+  // Subscribe to reaction events via WebSocket
+  useEffect(() => {
+    if (!selectedConv) return;
+
+    const handleReactionEvent = (data: WSMessage) => {
+      if (data.conversation_id !== selectedConv.id || !data.message_id) return;
+
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === data.message_id && data.data
+            ? { ...m, reactions: data.data as any }
+            : m
+        )
+      );
+    };
+
+    const unsubAdded = subscribe("reaction_added", handleReactionEvent);
+    const unsubRemoved = subscribe("reaction_removed", handleReactionEvent);
+
+    return () => {
+      unsubAdded();
+      unsubRemoved();
+    };
+  }, [selectedConv, subscribe]);
+
+  const handleReact = useCallback(
+    async (messageId: string, emoji: string) => {
+      try {
+        const result = await api.toggleReaction(messageId, emoji);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === messageId
+              ? { ...m, reactions: result.reactions }
+              : m
+          )
+        );
+      } catch (err) {
+        console.error("Failed to toggle reaction:", err);
+      }
+    },
+    []
+  );
 
   const handleSendMessage = useCallback(
     async (content: string) => {
@@ -175,6 +219,8 @@ export default function ChatPage() {
                 <MessageBubble
                   message={msg}
                   isOwn={msg.sender_id === user?.id}
+                  userId={user?.id || ""}
+                  onReact={handleReact}
                 />
               </motion.div>
             ))}
@@ -192,39 +238,87 @@ export default function ChatPage() {
 function MessageBubble({
   message,
   isOwn,
+  userId,
+  onReact,
 }: {
   message: Message;
   isOwn: boolean;
+  userId: string;
+  onReact: (messageId: string, emoji: string) => void;
 }) {
+  // Group reactions by emoji
+  const reactionSummary = message.reactions?.reduce<
+    Record<string, { count: number; hasReacted: boolean }>
+  >((acc, rxn) => {
+    if (!acc[rxn.emoji]) {
+      acc[rxn.emoji] = { count: 0, hasReacted: false };
+    }
+    acc[rxn.emoji].count++;
+    if (rxn.user_id === userId) {
+      acc[rxn.emoji].hasReacted = true;
+    }
+    return acc;
+  }, {});
+
   return (
     <div
       className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-2 message-enter`}
     >
-      <div
-        className={`max-w-[70%] rounded-2xl px-4 py-2 ${
-          isOwn
-            ? "bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-tr-md"
-            : "bg-[var(--surface-2)] border border-[var(--border)] text-[var(--foreground)] rounded-tl-md"
-        }`}
-      >
-        {!isOwn && (
-          <p className="text-xs font-medium text-[var(--accent)] mb-1">
-            {message.sender_username}
-          </p>
-        )}
-        <p className="text-sm whitespace-pre-wrap break-words">
-          {message.content}
-        </p>
-        <p
-          className={`text-[10px] mt-1 ${
-            isOwn ? "text-white/60" : "text-[var(--text-muted)]"
+      <div className="max-w-[70%] flex flex-col gap-1">
+        <div
+          className={`rounded-2xl px-4 py-2 ${
+            isOwn
+              ? "bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-tr-md"
+              : "bg-[var(--surface-2)] border border-[var(--border)] text-[var(--foreground)] rounded-tl-md"
           }`}
         >
-          {new Date(message.created_at).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </p>
+          {!isOwn && (
+            <p className="text-xs font-medium text-[var(--accent)] mb-1">
+              {message.sender_username}
+            </p>
+          )}
+          <p className="text-sm whitespace-pre-wrap break-words">
+            {message.content}
+          </p>
+          <p
+            className={`text-[10px] mt-1 ${
+              isOwn ? "text-white/60" : "text-[var(--text-muted)]"
+            }`}
+          >
+            {new Date(message.created_at).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+        </div>
+
+        {/* Reactions */}
+        {(reactionSummary && Object.keys(reactionSummary).length > 0) || (
+          <div className="flex items-center gap-1 pl-1">
+            <ReactionPicker messageId={message.id} onReact={onReact} />
+          </div>
+        )}
+        {reactionSummary && Object.keys(reactionSummary).length > 0 && (
+          <div className="flex items-center gap-1 pl-1">
+            {Object.entries(reactionSummary).map(([emoji, { count, hasReacted }]) => (
+              <button
+                key={emoji}
+                onClick={() => onReact(message.id, emoji)}
+                className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs transition-colors ${
+                  hasReacted
+                    ? "bg-[var(--primary)]/10 border border-[var(--primary)]/30"
+                    : "bg-[var(--surface-3)] border border-[var(--border)] hover:bg-[var(--surface-2)]"
+                }`}
+              >
+                <span>{emoji}</span>
+                {count > 1 && (
+                  <span className="text-[10px] text-[var(--text-muted)]">{count}</span>
+                )}
+              </button>
+            ))}
+            <ReactionPicker messageId={message.id} onReact={onReact} />
+          </div>
+        )}
       </div>
     </div>
   );
