@@ -292,6 +292,24 @@ func (m *mockNotifRepo) Delete(ctx context.Context, id, userID uuid.UUID) error 
 	return nil
 }
 
+type mockAttachmentRepo struct {
+	createFn         func(ctx context.Context, attachment *models.Attachment) error
+	getByMessageIDFn func(ctx context.Context, messageID uuid.UUID) ([]models.Attachment, error)
+}
+
+func (m *mockAttachmentRepo) Create(ctx context.Context, attachment *models.Attachment) error {
+	if m.createFn != nil {
+		return m.createFn(ctx, attachment)
+	}
+	return nil
+}
+func (m *mockAttachmentRepo) GetByMessageID(ctx context.Context, messageID uuid.UUID) ([]models.Attachment, error) {
+	if m.getByMessageIDFn != nil {
+		return m.getByMessageIDFn(ctx, messageID)
+	}
+	return nil, nil
+}
+
 // newMockRepos creates a *repository.Repositories with all mock repositories.
 // Default behavior: all methods return zero values (nil, 0, false).
 // Override individual mock functions in test cases to customize behavior.
@@ -302,6 +320,7 @@ func newMockRepos() *repository.Repositories {
 		Messages:      &mockMsgRepo{},
 		Sessions:      &mockSessionRepo{},
 		Notifications: &mockNotifRepo{},
+		Attachments:   &mockAttachmentRepo{},
 	}
 }
 

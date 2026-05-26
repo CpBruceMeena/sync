@@ -52,6 +52,19 @@ func (s *Service) ListMessages(ctx context.Context, convID uuid.UUID, cursor uui
 			})
 		}
 
+		// Fetch attachments for this message
+		attachments, _ := s.repos.Attachments.GetByMessageID(ctx, msg.ID)
+		attachmentResponses := make([]AttachmentResponse, 0, len(attachments))
+		for _, att := range attachments {
+			attachmentResponses = append(attachmentResponses, AttachmentResponse{
+				ID:       att.ID,
+				FileURL:  att.FileUrl,
+				FileType: att.FileType,
+				FileName: att.FileName,
+				FileSize: att.FileSize,
+			})
+		}
+
 		response = append(response, MessageResponse{
 			ID:             msg.ID,
 			ConversationID: msg.ConversationID,
@@ -61,6 +74,7 @@ func (s *Service) ListMessages(ctx context.Context, convID uuid.UUID, cursor uui
 			Type:           msg.Type,
 			CreatedAt:      msg.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			Reactions:      reactionResponses,
+			Attachments:    attachmentResponses,
 		})
 	}
 

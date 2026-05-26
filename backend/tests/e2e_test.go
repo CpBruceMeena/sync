@@ -13,6 +13,7 @@ import (
 	"github.com/CpBruceMeena/sync/internal/api"
 	"github.com/CpBruceMeena/sync/internal/auth"
 	"github.com/CpBruceMeena/sync/internal/conversations"
+	"github.com/CpBruceMeena/sync/internal/files"
 	"github.com/CpBruceMeena/sync/internal/messages"
 	"github.com/CpBruceMeena/sync/internal/models"
 	"github.com/CpBruceMeena/sync/internal/notifications"
@@ -282,7 +283,11 @@ func newMockE2ESuite() *mockE2ESuite {
 	reactionSvc := reactions.NewService(s.repos, wsHub, notifSvc)
 	reactionsHandler := reactions.NewHandler(reactionSvc)
 
-	s.mux = api.SetupRoutes(authHandler, usersHandler, convsHandler, msgsHandler, reactionsHandler, notifHandler, wsHandler, s.authSvc)
+	// File uploads
+	fileSvc := files.NewService(s.repos, "./uploads")
+	fileHandler := files.NewHandler(fileSvc, "./uploads")
+
+	s.mux = api.SetupRoutes(authHandler, usersHandler, convsHandler, msgsHandler, reactionsHandler, notifHandler, fileHandler, wsHandler, s.authSvc)
 
 	return s
 }

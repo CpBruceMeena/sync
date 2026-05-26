@@ -132,6 +132,70 @@ export default function ChatPage() {
     [selectedConv, user, sendMessage]
   );
 
+  const handleSendFile = useCallback(
+    async (file: File) => {
+      if (!selectedConv) return;
+
+      const tempId = `temp-${Date.now()}`;
+      const optimisticMsg: Message = {
+        id: tempId,
+        conversation_id: selectedConv.id,
+        sender_id: user?.id || "",
+        sender_username: user?.username || "",
+        content: file.name,
+        type: "file",
+        created_at: new Date().toISOString(),
+        attachments: [{
+          id: "",
+          file_url: "",
+          file_type: file.type,
+          file_name: file.name,
+          file_size: file.size,
+        }],
+      };
+
+      setMessages((prev) => [...prev, optimisticMsg]);
+
+      try {
+        const result = await api.uploadFile(selectedConv.id, file);
+
+        // Send a text message with the file reference
+        const msg = await api.sendMessage(
+          selectedConv.id,
+          `Sent a file: ${file.name}`,
+          "file"
+        );
+
+        const updatedMsg: Message = {
+          ...msg,
+          attachments: [{
+            id: result.id,
+            file_url: result.file_url,
+            file_type: result.file_type,
+            file_name: result.file_name,
+            file_size: result.file_size,
+          }],
+        };
+
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? updatedMsg : m))
+        );
+
+        // Broadcast via WebSocket
+        sendMessage({
+          type: "new_message",
+          conversation_id: selectedConv.id,
+          content: `Sent a file: ${file.name}`,
+          message_id: msg.id,
+        });
+      } catch (err) {
+        console.error("Failed to send file:", err);
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+      }
+    },
+    [selectedConv, user, sendMessage]
+  );
+
   if (!selectedConv) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -229,7 +293,7 @@ export default function ChatPage() {
       </div>
 
       {/* Input */}
-      <MessageInput onSend={handleSendMessage} />
+      <MessageInput onSend={handleSendMessage} onSendFile={handleSendFile} />
     </div>
   );
 }
@@ -260,6 +324,16 @@ function MessageBubble({
     return acc;
   }, {});
 
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
+
+  const isImageMime = (mime: string): boolean => {
+    return mime.startsWith("image/");
+  };
+
   return (
     <div
       className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-2 message-enter`}
@@ -277,9 +351,62 @@ function MessageBubble({
               {message.sender_username}
             </p>
           )}
-          <p className="text-sm whitespace-pre-wrap break-words">
-            {message.content}
-          </p>
+
+          {/* Attachment previews */}
+          {message.attachments && message.attachments.length > 0 && (
+            <div className="mb-1.5 space-y-1">
+              {message.attachments.map((att) => (
+                <div key={att.id || att.file_name}>
+                  {isImageMime(att.file_type) ? (
+                    <a
+                      href={api.getFileUrl(att.file_url)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block"
+                    >
+                      <img
+                        src={api.getFileUrl(att.file_url)}
+                        alt={att.file_name}
+                        className="max-w-full rounded-lg max-h-64 object-cover border border-[var(--border)]"
+                      />
+                    </a>
+                  ) : (
+                    <a
+                      href={api.getFileUrl(att.file_url)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
+                        isOwn
+                          ? "bg-white/10 border-white/20 hover:bg-white/15"
+                          : "bg-[var(--surface-3)] border-[var(--border)] hover:bg-[var(--surface-2)]"
+                      }`}
+                    >
+                      <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate">
+                          {att.file_name}
+                        </p>
+                        <p className="text-[10px] opacity-60">
+                          {formatFileSize(att.file_size)}
+                        </p>
+                      </div>
+                      <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {message.content && (message.type !== "file" || !message.attachments?.length) && (
+            <p className="text-sm whitespace-pre-wrap break-words">
+              {message.content}
+            </p>
+          )}
           <p
             className={`text-[10px] mt-1 ${
               isOwn ? "text-white/60" : "text-[var(--text-muted)]"
