@@ -54,3 +54,9 @@ func (r *messageRepository) RemoveReaction(ctx context.Context, messageID, userI
 		Where("message_id = ? AND user_id = ? AND emoji = ?", messageID, userID, emoji).
 		Delete(&models.Reaction{}).Error
 }
+
+func (r *messageRepository) GetReactionsByMessage(ctx context.Context, messageID uuid.UUID) ([]models.Reaction, error) {
+	var reactions []models.Reaction
+	err := r.db.WithContext(ctx).Where("message_id = ?", messageID).Find(&reactions).Error
+	return reactions, err
+}

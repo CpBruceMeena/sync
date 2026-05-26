@@ -7,6 +7,8 @@ import (
 	"github.com/CpBruceMeena/sync/internal/conversations"
 	"github.com/CpBruceMeena/sync/internal/messages"
 	"github.com/CpBruceMeena/sync/internal/middleware"
+	"github.com/CpBruceMeena/sync/internal/notifications"
+	"github.com/CpBruceMeena/sync/internal/reactions"
 	"github.com/CpBruceMeena/sync/internal/users"
 	"github.com/CpBruceMeena/sync/internal/websocket"
 	"github.com/go-chi/chi/v5"
@@ -18,12 +20,14 @@ import (
 )
 
 // SetupRoutes configures all API routes and returns a chi router.
-// Business logic remains in handler files within their respective packages.
+// Business logic resides in service files within their respective packages.
 func SetupRoutes(
 	authHandler *auth.Handler,
 	usersHandler *users.Handler,
 	conversationsHandler *conversations.Handler,
 	messagesHandler *messages.Handler,
+	reactionsHandler *reactions.Handler,
+	notificationsHandler *notifications.Handler,
 	wsHandler *websocket.WsHandler,
 	authService *auth.Service,
 ) *chi.Mux {
@@ -49,37 +53,17 @@ func SetupRoutes(
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	// Public auth routes
-	r.Route("/api/auth", func(r chi.Router) {
-		r.Post("/register", authHandler.Register)
-		r.Post("/login", authHandler.Login)
-		r.Post("/refresh", authHandler.Refresh)
-	})
+	// Public routes (no auth required)
+	registerPublicAuthRoutes(r, authHandler)
 
-	// Protected routes
+	// Protected routes (auth required)
 	r.Group(func(r chi.Router) {
 		r.Use(middleware.AuthMiddleware(authService))
 
-		// Auth
-		r.Post("/api/auth/logout", authHandler.Logout)
-		r.Get("/api/auth/me", authHandler.Me)
-
-		// Users
-		r.Get("/api/users", usersHandler.ListUsers)
-		r.Get("/api/users/{id}", usersHandler.GetUser)
-		r.Put("/api/users/me", usersHandler.UpdateProfile)
-
-		// Conversations
-		r.Get("/api/conversations", conversationsHandler.ListConversations)
-		r.Post("/api/conversations", conversationsHandler.CreateConversation)
-		r.Get("/api/conversations/{id}", conversationsHandler.GetConversation)
-		r.Post("/api/conversations/{id}/members", conversationsHandler.AddMember)
-		r.Delete("/api/conversations/{id}/members/{userId}", conversationsHandler.RemoveMember)
-
-		// Messages
-		r.Get("/api/conversations/{id}/messages", messagesHandler.ListMessages)
-		r.Post("/api/conversations/{id}/messages", messagesHandler.SendMessage)
-		r.Delete("/api/messages/{id}", messagesHandler.DeleteMessage)
+		registerProtectedAuthRoutes(r, authHandler)
+		registerUserRoutes(r, usersHandler)
+		registerConversationRoutes(r, conversationsHandler, messagesHandler, reactionsHandler)
+		registerNotificationRoutes(r, notificationsHandler)
 	})
 
 	// Swagger documentation

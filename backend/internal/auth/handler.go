@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/CpBruceMeena/sync/internal/httputil"
 	"github.com/CpBruceMeena/sync/internal/models"
 	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/google/uuid"
@@ -34,7 +35,7 @@ func NewHandler(authService *Service, repos *repository.Repositories) *Handler {
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid request body")
+		httputil.RespondError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
@@ -42,33 +43,33 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
 
 	if req.Username == "" || req.Email == "" || req.Password == "" {
-		respondError(w, http.StatusBadRequest, "Username, email, and password are required")
+		httputil.RespondError(w, http.StatusBadRequest, "Username, email, and password are required")
 		return
 	}
 
 	if len(req.Password) < 6 {
-		respondError(w, http.StatusBadRequest, "Password must be at least 6 characters")
+		httputil.RespondError(w, http.StatusBadRequest, "Password must be at least 6 characters")
 		return
 	}
 
 	// Check if email already exists
 	existing, err := h.repos.Users.GetByEmail(r.Context(), req.Email)
 	if err == nil && existing != nil {
-		respondError(w, http.StatusConflict, "Email already registered")
+		httputil.RespondError(w, http.StatusConflict, "Email already registered")
 		return
 	}
 
 	// Check if username already exists
 	existingUser, err := h.repos.Users.GetByUsername(r.Context(), req.Username)
 	if err == nil && existingUser != nil {
-		respondError(w, http.StatusConflict, "Username already taken")
+		httputil.RespondError(w, http.StatusConflict, "Username already taken")
 		return
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		log.Printf("Error hashing password: %v", err)
-		respondError(w, http.StatusInternalServerError, "Failed to create user")
+		httputil.RespondError(w, http.StatusInternalServerError, "Failed to create user")
 		return
 	}
 
@@ -81,14 +82,14 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.repos.Users.Create(r.Context(), user); err != nil {
 		log.Printf("Error creating user: %v", err)
-		respondError(w, http.StatusInternalServerError, "Failed to create user")
+		httputil.RespondError(w, http.StatusInternalServerError, "Failed to create user")
 		return
 	}
 
 	tokens, err := h.authService.GenerateTokens(user.ID, user.Username)
 	if err != nil {
 		log.Printf("Error generating tokens: %v", err)
-		respondError(w, http.StatusInternalServerError, "Failed to generate tokens")
+		httputil.RespondError(w, http.StatusInternalServerError, "Failed to generate tokens")
 		return
 	}
 
@@ -101,7 +102,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error creating session: %v", err)
 	}
 
-	respondJSON(w, http.StatusCreated, AuthResponse{
+	httputil.RespondJSON(w, http.StatusCreated, AuthResponse{
 		User: UserResponse{
 			ID:          user.ID,
 			Username:    user.Username,
@@ -128,32 +129,32 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid request body")
+		httputil.RespondError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	req.Email = strings.TrimSpace(strings.ToLower(req.Email))
 
 	if req.Email == "" || req.Password == "" {
-		respondError(w, http.StatusBadRequest, "Email and password are required")
+		httputil.RespondError(w, http.StatusBadRequest, "Email and password are required")
 		return
 	}
 
 	user, err := h.repos.Users.GetByEmailWithPassword(r.Context(), req.Email)
 	if err != nil {
-		respondError(w, http.StatusUnauthorized, "Invalid email or password")
+		httputil.RespondError(w, http.StatusUnauthorized, "Invalid email or password")
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		respondError(w, http.StatusUnauthorized, "Invalid email or password")
+		httputil.RespondError(w, http.StatusUnauthorized, "Invalid email or password")
 		return
 	}
 
 	tokens, err := h.authService.GenerateTokens(user.ID, user.Username)
 	if err != nil {
 		log.Printf("Error generating tokens: %v", err)
-		respondError(w, http.StatusInternalServerError, "Failed to generate tokens")
+		httputil.RespondError(w, http.StatusInternalServerError, "Failed to generate tokens")
 		return
 	}
 
@@ -166,7 +167,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error creating session: %v", err)
 	}
 
-	respondJSON(w, http.StatusOK, AuthResponse{
+	httputil.RespondJSON(w, http.StatusOK, AuthResponse{
 		User: UserResponse{
 			ID:          user.ID,
 			Username:    user.Username,
@@ -193,24 +194,24 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 	var req RefreshRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid request body")
+		httputil.RespondError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
 	if req.RefreshToken == "" {
-		respondError(w, http.StatusBadRequest, "Refresh token is required")
+		httputil.RespondError(w, http.StatusBadRequest, "Refresh token is required")
 		return
 	}
 
 	session, err := h.repos.Sessions.GetByToken(r.Context(), req.RefreshToken)
 	if err != nil {
-		respondError(w, http.StatusUnauthorized, "Invalid refresh token")
+		httputil.RespondError(w, http.StatusUnauthorized, "Invalid refresh token")
 		return
 	}
 
 	if session.ExpiresAt.Before(time.Now()) {
 		h.repos.Sessions.Delete(r.Context(), session.ID)
-		respondError(w, http.StatusUnauthorized, "Refresh token expired")
+		httputil.RespondError(w, http.StatusUnauthorized, "Refresh token expired")
 		return
 	}
 
@@ -219,14 +220,14 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.repos.Users.GetByID(r.Context(), session.UserID)
 	if err != nil {
-		respondError(w, http.StatusInternalServerError, "User not found")
+		httputil.RespondError(w, http.StatusInternalServerError, "User not found")
 		return
 	}
 
 	tokens, err := h.authService.GenerateTokens(user.ID, user.Username)
 	if err != nil {
 		log.Printf("Error generating tokens: %v", err)
-		respondError(w, http.StatusInternalServerError, "Failed to generate tokens")
+		httputil.RespondError(w, http.StatusInternalServerError, "Failed to generate tokens")
 		return
 	}
 
@@ -239,7 +240,7 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error creating session: %v", err)
 	}
 
-	respondJSON(w, http.StatusOK, map[string]interface{}{
+	httputil.RespondJSON(w, http.StatusOK, map[string]interface{}{
 		"token": tokens,
 	})
 }
@@ -252,6 +253,7 @@ func (h *Handler) Refresh(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} map[string]string
+// @Failure 401 {object} map[string]string
 // @Router /api/auth/logout [post]
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(uuid.UUID)
@@ -260,7 +262,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Error deleting sessions: %v", err)
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{"message": "Logged out successfully"})
+	httputil.RespondJSON(w, http.StatusOK, map[string]string{"message": "Logged out successfully"})
 }
 
 // Me returns the authenticated user's profile
@@ -271,6 +273,7 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {object} UserResponse
+// @Failure 401 {object} map[string]string
 // @Failure 404 {object} map[string]string
 // @Router /api/auth/me [get]
 func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
@@ -278,11 +281,11 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 
 	user, err := h.repos.Users.GetByID(r.Context(), userID)
 	if err != nil {
-		respondError(w, http.StatusNotFound, "User not found")
+		httputil.RespondError(w, http.StatusNotFound, "User not found")
 		return
 	}
 
-	respondJSON(w, http.StatusOK, UserResponse{
+	httputil.RespondJSON(w, http.StatusOK, UserResponse{
 		ID:          user.ID,
 		Username:    user.Username,
 		Email:       user.Email,
@@ -290,16 +293,6 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		AvatarURL:   user.AvatarUrl,
 		Status:      user.Status,
 	})
-}
-
-func respondJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
-}
-
-func respondError(w http.ResponseWriter, status int, message string) {
-	respondJSON(w, status, map[string]string{"error": message})
 }
 
 // GetAuthService exposes the auth service for WebSocket handler

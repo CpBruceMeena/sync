@@ -5,13 +5,14 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/CpBruceMeena/sync/internal/repository"
+	"github.com/CpBruceMeena/sync/internal/httputil"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )
 
-func NewHandler(repos *repository.Repositories) *Handler {
-	return &Handler{repos: repos}
+// NewHandler creates a new users HTTP handler
+func NewHandler(svc *Service) *Handler {
+	return &Handler{service: svc}
 }
 
 // ListUsers returns all registered users
@@ -25,26 +26,14 @@ func NewHandler(repos *repository.Repositories) *Handler {
 // @Failure 500 {object} map[string]string
 // @Router /api/users [get]
 func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := h.repos.Users.List(r.Context())
+	users, err := h.service.ListUsers(r.Context())
 	if err != nil {
 		log.Printf("Error listing users: %v", err)
-		respondError(w, http.StatusInternalServerError, "Failed to list users")
+		httputil.RespondError(w, http.StatusInternalServerError, "Failed to list users")
 		return
 	}
 
-	response := make([]UserResponse, 0, len(users))
-	for _, u := range users {
-		response = append(response, UserResponse{
-			ID:          u.ID,
-			Username:    u.Username,
-			Email:       u.Email,
-			DisplayName: u.DisplayName,
-			AvatarURL:   u.AvatarUrl,
-			Status:      u.Status,
-		})
-	}
-
-	respondJSON(w, http.StatusOK, response)
+	httputil.RespondJSON(w, http.StatusOK, users)
 }
 
 // GetUser returns a specific user by ID
@@ -63,24 +52,17 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	userIDStr := chi.URLParam(r, "id")
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid user ID")
+		httputil.RespondError(w, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
-	user, err := h.repos.Users.GetByID(r.Context(), userID)
+	user, err := h.service.GetUser(r.Context(), userID)
 	if err != nil {
-		respondError(w, http.StatusNotFound, "User not found")
+		httputil.RespondError(w, http.StatusNotFound, "User not found")
 		return
 	}
 
-	respondJSON(w, http.StatusOK, UserResponse{
-		ID:          user.ID,
-		Username:    user.Username,
-		Email:       user.Email,
-		DisplayName: user.DisplayName,
-		AvatarURL:   user.AvatarUrl,
-		Status:      user.Status,
-	})
+	httputil.RespondJSON(w, http.StatusOK, user)
 }
 
 // UpdateProfile updates the authenticated user's profile
@@ -97,53 +79,18 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(uuid.UUID)
 
-	var req struct {
-		DisplayName string `json:"display_name"`
-		AvatarURL   string `json:"avatar_url"`
-		Status      string `json:"status"`
-	}
+	var req UpdateProfileRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, "Invalid request body")
+		httputil.RespondError(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	user, err := h.repos.Users.GetByID(r.Context(), userID)
+	user, err := h.service.UpdateProfile(r.Context(), userID, req.DisplayName, req.AvatarURL, req.Status)
 	if err != nil {
-		respondError(w, http.StatusNotFound, "User not found")
-		return
-	}
-
-	if req.DisplayName != "" {
-		user.DisplayName = req.DisplayName
-	}
-	if req.AvatarURL != "" {
-		user.AvatarUrl = req.AvatarURL
-	}
-	if req.Status != "" {
-		user.Status = req.Status
-	}
-	if err := h.repos.Users.Update(r.Context(), user); err != nil {
 		log.Printf("Error updating user: %v", err)
-		respondError(w, http.StatusInternalServerError, "Failed to update profile")
+		httputil.RespondError(w, http.StatusInternalServerError, "Failed to update profile")
 		return
 	}
 
-	respondJSON(w, http.StatusOK, UserResponse{
-		ID:          user.ID,
-		Username:    user.Username,
-		Email:       user.Email,
-		DisplayName: user.DisplayName,
-		AvatarURL:   user.AvatarUrl,
-		Status:      user.Status,
-	})
-}
-
-func respondJSON(w http.ResponseWriter, status int, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
-}
-
-func respondError(w http.ResponseWriter, status int, message string) {
-	respondJSON(w, status, map[string]string{"error": message})
+	httputil.RespondJSON(w, http.StatusOK, user)
 }

@@ -1,24 +1,24 @@
 definitions:
-  auth.AuthResponse:
+  internal_auth.AuthResponse:
     properties:
       token:
-        $ref: '#/definitions/auth.TokenPair'
+        $ref: '#/definitions/internal_auth.TokenPair'
       user:
-        $ref: '#/definitions/auth.UserResponse'
+        $ref: '#/definitions/internal_auth.UserResponse'
     type: object
-  auth.LoginRequest:
+  internal_auth.LoginRequest:
     properties:
       email:
         type: string
       password:
         type: string
     type: object
-  auth.RefreshRequest:
+  internal_auth.RefreshRequest:
     properties:
       refresh_token:
         type: string
     type: object
-  auth.RegisterRequest:
+  internal_auth.RegisterRequest:
     properties:
       email:
         type: string
@@ -27,7 +27,7 @@ definitions:
       username:
         type: string
     type: object
-  auth.TokenPair:
+  internal_auth.TokenPair:
     properties:
       access_token:
         type: string
@@ -36,7 +36,7 @@ definitions:
       refresh_token:
         type: string
     type: object
-  auth.UserResponse:
+  internal_auth.UserResponse:
     properties:
       avatar_url:
         type: string
@@ -51,7 +51,56 @@ definitions:
       username:
         type: string
     type: object
-  users.UserResponse:
+  internal_conversations.ConversationResponse:
+    properties:
+      admin_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      last_message_at:
+        type: string
+      last_message_content:
+        type: string
+      members:
+        items:
+          $ref: '#/definitions/internal_conversations.MemberResponse'
+        type: array
+      name:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  internal_conversations.MemberResponse:
+    properties:
+      joined_at:
+        type: string
+      role:
+        type: string
+      user_id:
+        type: string
+      username:
+        type: string
+    type: object
+  internal_notifications.NotificationResponse:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      is_read:
+        type: boolean
+      reference_id:
+        type: string
+      type:
+        type: string
+    type: object
+  internal_users.UserResponse:
     properties:
       avatar_url:
         type: string
@@ -80,14 +129,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/auth.LoginRequest'
+          $ref: '#/definitions/internal_auth.LoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/auth.AuthResponse'
+            $ref: '#/definitions/internal_auth.AuthResponse'
         "400":
           description: Bad Request
           schema:
@@ -117,6 +166,12 @@ paths:
             additionalProperties:
               type: string
             type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
       security:
       - BearerAuth: []
       summary: Logout
@@ -133,7 +188,13 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/auth.UserResponse'
+            $ref: '#/definitions/internal_auth.UserResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "404":
           description: Not Found
           schema:
@@ -156,7 +217,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/auth.RefreshRequest'
+          $ref: '#/definitions/internal_auth.RefreshRequest'
       produces:
       - application/json
       responses:
@@ -191,14 +252,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/auth.RegisterRequest'
+          $ref: '#/definitions/internal_auth.RegisterRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/auth.AuthResponse'
+            $ref: '#/definitions/internal_auth.AuthResponse'
         "400":
           description: Bad Request
           schema:
@@ -227,9 +288,14 @@ paths:
           description: OK
           schema:
             items:
-              additionalProperties: true
-              type: object
+              $ref: '#/definitions/internal_conversations.ConversationResponse'
             type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "500":
           description: Internal Server Error
           schema:
@@ -251,10 +317,15 @@ paths:
         "201":
           description: Created
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/internal_conversations.ConversationResponse'
         "400":
           description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
           schema:
             additionalProperties:
               type: string
@@ -287,10 +358,15 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/internal_conversations.ConversationResponse'
         "400":
           description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
           schema:
             additionalProperties:
               type: string
@@ -328,6 +404,12 @@ paths:
             type: object
         "400":
           description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
           schema:
             additionalProperties:
               type: string
@@ -376,6 +458,12 @@ paths:
             type: object
         "400":
           description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
           schema:
             additionalProperties:
               type: string
@@ -510,6 +598,160 @@ paths:
       summary: Delete message
       tags:
       - messages
+  /api/messages/{id}/reactions:
+    post:
+      consumes:
+      - application/json
+      description: Add or remove an emoji reaction on a message
+      parameters:
+      - description: Message ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Toggle reaction
+      tags:
+      - reactions
+  /api/notifications:
+    get:
+      consumes:
+      - application/json
+      description: Get paginated notifications for the authenticated user
+      parameters:
+      - description: Number of notifications to return
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_notifications.NotificationResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List notifications
+      tags:
+      - notifications
+  /api/notifications/{id}/read:
+    put:
+      consumes:
+      - application/json
+      description: Marks a specific notification as read
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Mark notification as read
+      tags:
+      - notifications
+  /api/notifications/read-all:
+    put:
+      consumes:
+      - application/json
+      description: Marks all notifications as read
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Mark all notifications as read
+      tags:
+      - notifications
+  /api/notifications/unread-count:
+    get:
+      consumes:
+      - application/json
+      description: Returns the number of unread notifications
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              format: int64
+              type: integer
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get unread notification count
+      tags:
+      - notifications
   /api/users:
     get:
       consumes:
@@ -522,7 +764,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/users.UserResponse'
+              $ref: '#/definitions/internal_users.UserResponse'
             type: array
         "500":
           description: Internal Server Error
@@ -552,7 +794,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/users.UserResponse'
+            $ref: '#/definitions/internal_users.UserResponse'
         "400":
           description: Bad Request
           schema:
@@ -582,7 +824,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/users.UserResponse'
+            $ref: '#/definitions/internal_users.UserResponse'
         "400":
           description: Bad Request
           schema:

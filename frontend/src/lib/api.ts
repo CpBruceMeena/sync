@@ -114,4 +114,27 @@ export const api = {
 
   deleteMessage: (id: string) =>
     request<void>(`/api/messages/${id}`, { method: "DELETE" }),
+
+  // Reactions
+  toggleReaction: (messageId: string, emoji: string) =>
+    request<{ reactions: import("../types").MessageReaction[] }>(
+      `/api/messages/${messageId}/reactions`,
+      {
+        method: "POST",
+        body: JSON.stringify({ emoji }),
+      }
+    ),
+
+  // Notifications
+  getNotifications: (limit = 50) =>
+    request<import("../types").Notification[]>(`/api/notifications?limit=${limit}`),
+
+  getUnreadCount: () =>
+    request<{ count: number }>("/api/notifications/unread-count"),
+
+  markNotificationRead: (id: string) =>
+    request<void>(`/api/notifications/${id}/read`, { method: "PUT" }),
+
+  markAllNotificationsRead: () =>
+    request<void>("/api/notifications/read-all", { method: "PUT" }),
 };
