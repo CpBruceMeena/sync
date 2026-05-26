@@ -52,6 +52,19 @@ func (s *Service) ListMessages(ctx context.Context, convID uuid.UUID, cursor uui
 			})
 		}
 
+		// Fetch attachments for this message
+		attachments, _ := s.repos.Attachments.GetByMessageID(ctx, msg.ID)
+		attachmentResponses := make([]AttachmentResponse, 0, len(attachments))
+		for _, att := range attachments {
+			attachmentResponses = append(attachmentResponses, AttachmentResponse{
+				ID:       att.ID,
+				FileURL:  att.FileUrl,
+				FileType: att.FileType,
+				FileName: att.FileName,
+				FileSize: att.FileSize,
+			})
+		}
+
 		response = append(response, MessageResponse{
 			ID:             msg.ID,
 			ConversationID: msg.ConversationID,
@@ -61,6 +74,7 @@ func (s *Service) ListMessages(ctx context.Context, convID uuid.UUID, cursor uui
 			Type:           msg.Type,
 			CreatedAt:      msg.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			Reactions:      reactionResponses,
+			Attachments:    attachmentResponses,
 		})
 	}
 
@@ -68,7 +82,7 @@ func (s *Service) ListMessages(ctx context.Context, convID uuid.UUID, cursor uui
 }
 
 // SendMessage creates a new message and sends notifications to conversation members
-func (s *Service) SendMessage(ctx context.Context, senderID uuid.UUID, convID uuid.UUID, content string, msgType string) (*models.Message, error) {
+func (s *Service) SendMessage(ctx context.Context, senderID uuid.UUID, convID uuid.UUID, content string, msgType string, attachment *AttachmentUpload) (*models.Message, error) {
 	if msgType == "" {
 		msgType = "text"
 	}
@@ -81,6 +95,20 @@ func (s *Service) SendMessage(ctx context.Context, senderID uuid.UUID, convID uu
 	}
 	if err := s.repos.Messages.Create(ctx, msg); err != nil {
 		return nil, err
+	}
+
+	// Create attachment record if provided
+	if attachment != nil {
+		att := &models.Attachment{
+			MessageID: msg.ID,
+			FileUrl:   attachment.FileURL,
+			FileType:  attachment.FileType,
+			FileName:  attachment.FileName,
+			FileSize:  attachment.FileSize,
+		}
+		if err := s.repos.Attachments.Create(ctx, att); err != nil {
+			log.Printf("Failed to save attachment for message %s: %v", msg.ID, err)
+		}
 	}
 
 	// Notify conversation members (except sender)

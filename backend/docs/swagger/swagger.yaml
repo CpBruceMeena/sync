@@ -1,24 +1,24 @@
 definitions:
-  internal_auth.AuthResponse:
+  auth.AuthResponse:
     properties:
       token:
-        $ref: '#/definitions/internal_auth.TokenPair'
+        $ref: '#/definitions/auth.TokenPair'
       user:
-        $ref: '#/definitions/internal_auth.UserResponse'
+        $ref: '#/definitions/auth.UserResponse'
     type: object
-  internal_auth.LoginRequest:
+  auth.LoginRequest:
     properties:
       email:
         type: string
       password:
         type: string
     type: object
-  internal_auth.RefreshRequest:
+  auth.RefreshRequest:
     properties:
       refresh_token:
         type: string
     type: object
-  internal_auth.RegisterRequest:
+  auth.RegisterRequest:
     properties:
       email:
         type: string
@@ -27,7 +27,7 @@ definitions:
       username:
         type: string
     type: object
-  internal_auth.TokenPair:
+  auth.TokenPair:
     properties:
       access_token:
         type: string
@@ -36,7 +36,7 @@ definitions:
       refresh_token:
         type: string
     type: object
-  internal_auth.UserResponse:
+  auth.UserResponse:
     properties:
       avatar_url:
         type: string
@@ -51,7 +51,7 @@ definitions:
       username:
         type: string
     type: object
-  internal_conversations.ConversationResponse:
+  conversations.ConversationResponse:
     properties:
       admin_id:
         type: string
@@ -65,7 +65,7 @@ definitions:
         type: string
       members:
         items:
-          $ref: '#/definitions/internal_conversations.MemberResponse'
+          $ref: '#/definitions/conversations.MemberResponse'
         type: array
       name:
         type: string
@@ -74,7 +74,7 @@ definitions:
       updated_at:
         type: string
     type: object
-  internal_conversations.MemberResponse:
+  conversations.MemberResponse:
     properties:
       joined_at:
         type: string
@@ -85,7 +85,33 @@ definitions:
       username:
         type: string
     type: object
-  internal_notifications.NotificationResponse:
+  files.AttachmentResponse:
+    properties:
+      file_name:
+        type: string
+      file_size:
+        type: integer
+      file_type:
+        type: string
+      file_url:
+        type: string
+      id:
+        type: string
+    type: object
+  files.UploadResponse:
+    properties:
+      attachment:
+        $ref: '#/definitions/files.AttachmentResponse'
+      file_name:
+        type: string
+      file_size:
+        type: integer
+      file_type:
+        type: string
+      file_url:
+        type: string
+    type: object
+  notifications.NotificationResponse:
     properties:
       content:
         type: string
@@ -100,7 +126,7 @@ definitions:
       type:
         type: string
     type: object
-  internal_users.UserResponse:
+  users.UserResponse:
     properties:
       avatar_url:
         type: string
@@ -129,14 +155,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_auth.LoginRequest'
+          $ref: '#/definitions/auth.LoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_auth.AuthResponse'
+            $ref: '#/definitions/auth.AuthResponse'
         "400":
           description: Bad Request
           schema:
@@ -188,7 +214,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_auth.UserResponse'
+            $ref: '#/definitions/auth.UserResponse'
         "401":
           description: Unauthorized
           schema:
@@ -217,7 +243,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_auth.RefreshRequest'
+          $ref: '#/definitions/auth.RefreshRequest'
       produces:
       - application/json
       responses:
@@ -252,14 +278,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_auth.RegisterRequest'
+          $ref: '#/definitions/auth.RegisterRequest'
       produces:
       - application/json
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_auth.AuthResponse'
+            $ref: '#/definitions/auth.AuthResponse'
         "400":
           description: Bad Request
           schema:
@@ -288,7 +314,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/internal_conversations.ConversationResponse'
+              $ref: '#/definitions/conversations.ConversationResponse'
             type: array
         "401":
           description: Unauthorized
@@ -317,7 +343,7 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/internal_conversations.ConversationResponse'
+            $ref: '#/definitions/conversations.ConversationResponse'
         "400":
           description: Bad Request
           schema:
@@ -358,7 +384,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_conversations.ConversationResponse'
+            $ref: '#/definitions/conversations.ConversationResponse'
         "400":
           description: Bad Request
           schema:
@@ -561,6 +587,72 @@ paths:
       summary: Send message
       tags:
       - messages
+  /api/files/{filename}:
+    get:
+      description: Retrieve an uploaded file by filename
+      parameters:
+      - description: Filename
+        in: path
+        name: filename
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get file
+      tags:
+      - files
+  /api/files/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a file (image, document, etc.) and return the file metadata
+      parameters:
+      - description: File to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/files.UploadResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "413":
+          description: Request Entity Too Large
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Upload file
+      tags:
+      - files
   /api/messages/{id}:
     delete:
       consumes:
@@ -651,7 +743,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/internal_notifications.NotificationResponse'
+              $ref: '#/definitions/notifications.NotificationResponse'
             type: array
         "401":
           description: Unauthorized
@@ -764,7 +856,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/internal_users.UserResponse'
+              $ref: '#/definitions/users.UserResponse'
             type: array
         "500":
           description: Internal Server Error
@@ -794,7 +886,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_users.UserResponse'
+            $ref: '#/definitions/users.UserResponse'
         "400":
           description: Bad Request
           schema:
@@ -824,7 +916,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/internal_users.UserResponse'
+            $ref: '#/definitions/users.UserResponse'
         "400":
           description: Bad Request
           schema:

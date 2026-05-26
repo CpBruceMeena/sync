@@ -15,6 +15,7 @@ import (
 	"github.com/CpBruceMeena/sync/internal/config"
 	"github.com/CpBruceMeena/sync/internal/conversations"
 	"github.com/CpBruceMeena/sync/internal/database"
+	"github.com/CpBruceMeena/sync/internal/files"
 	"github.com/CpBruceMeena/sync/internal/messages"
 	"github.com/CpBruceMeena/sync/internal/notifications"
 	"github.com/CpBruceMeena/sync/internal/reactions"
@@ -56,6 +57,10 @@ func main() {
 	reactionSvc := reactions.NewService(repos, wsHub, notifSvc)
 	reactionsHandler := reactions.NewHandler(reactionSvc)
 
+	// File uploads
+	fileSvc := files.NewService(repos, cfg.UploadDir)
+	fileHandler := files.NewHandler(fileSvc, cfg.UploadDir)
+
 	// All routes are defined in internal/api/routes.go
 	r := api.SetupRoutes(
 		authHandler,
@@ -64,6 +69,7 @@ func main() {
 		messagesHandler,
 		reactionsHandler,
 		notifHandler,
+		fileHandler,
 		wsHandler,
 		authService,
 	)

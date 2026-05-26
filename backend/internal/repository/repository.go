@@ -9,6 +9,7 @@ type Repositories struct {
 	Messages      MessageRepository
 	Sessions      SessionRepository
 	Notifications NotificationRepository
+	Attachments   AttachmentRepository
 }
 
 // NewRepositories creates all repository instances
@@ -19,5 +20,6 @@ func NewRepositories(db *gorm.DB) *Repositories {
 		Messages:      NewMessageRepository(db),
 		Sessions:      NewSessionRepository(db),
 		Notifications: NewNotificationRepository(db),
+		Attachments:   NewAttachmentRepository(db),
 	}
 }

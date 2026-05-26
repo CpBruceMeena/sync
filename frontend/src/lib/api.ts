@@ -106,10 +106,10 @@ export const api = {
       }`
     ),
 
-  sendMessage: (conversationId: string, content: string, type = "text") =>
+  sendMessage: (conversationId: string, content: string, type = "text", attachment?: import("../types").Attachment) =>
     request<import("../types").Message>(`/api/conversations/${conversationId}/messages`, {
       method: "POST",
-      body: JSON.stringify({ content, type }),
+      body: JSON.stringify({ content, type, attachment }),
     }),
 
   deleteMessage: (id: string) =>
@@ -137,4 +137,28 @@ export const api = {
 
   markAllNotificationsRead: () =>
     request<void>("/api/notifications/read-all", { method: "PUT" }),
+
+  // Files
+  uploadFile: async (conversationId: string, file: File) => {
+    const token = localStorage.getItem("access_token");
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const res = await fetch(`${API_BASE}/api/files/upload`, {
+      method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new ApiError(body.error || res.statusText, res.status);
+    }
+
+    return res.json() as Promise<import("../types").Attachment>;
+  },
+
+  getFileUrl: (filename: string) => `${API_BASE}/api/files/${filename}`,
 };

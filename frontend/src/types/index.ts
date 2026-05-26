@@ -46,6 +46,15 @@ export interface Message {
   type: string;
   created_at: string;
   reactions?: MessageReaction[];
+  attachments?: Attachment[];
+}
+
+export interface Attachment {
+  id: string;
+  file_url: string;
+  file_type: string;
+  file_name: string;
+  file_size: number;
 }
 
 export interface MessageReaction {

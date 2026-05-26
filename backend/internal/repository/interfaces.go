@@ -63,3 +63,9 @@ type NotificationRepository interface {
 	GetUnreadCount(ctx context.Context, userID uuid.UUID) (int64, error)
 	Delete(ctx context.Context, id, userID uuid.UUID) error
 }
+
+// AttachmentRepository defines attachment data operations
+type AttachmentRepository interface {
+	Create(ctx context.Context, attachment *models.Attachment) error
+	GetByMessageID(ctx context.Context, messageID uuid.UUID) ([]models.Attachment, error)
+}

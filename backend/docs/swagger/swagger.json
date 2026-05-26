@@ -24,7 +24,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_auth.LoginRequest"
+                            "$ref": "#/definitions/auth.LoginRequest"
                         }
                     }
                 ],
@@ -32,7 +32,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_auth.AuthResponse"
+                            "$ref": "#/definitions/auth.AuthResponse"
                         }
                     },
                     "400": {
@@ -118,7 +118,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_auth.UserResponse"
+                            "$ref": "#/definitions/auth.UserResponse"
                         }
                     },
                     "401": {
@@ -162,7 +162,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_auth.RefreshRequest"
+                            "$ref": "#/definitions/auth.RefreshRequest"
                         }
                     }
                 ],
@@ -215,7 +215,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/internal_auth.RegisterRequest"
+                            "$ref": "#/definitions/auth.RegisterRequest"
                         }
                     }
                 ],
@@ -223,7 +223,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_auth.AuthResponse"
+                            "$ref": "#/definitions/auth.AuthResponse"
                         }
                     },
                     "400": {
@@ -271,7 +271,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_conversations.ConversationResponse"
+                                "$ref": "#/definitions/conversations.ConversationResponse"
                             }
                         }
                     },
@@ -316,7 +316,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/internal_conversations.ConversationResponse"
+                            "$ref": "#/definitions/conversations.ConversationResponse"
                         }
                     },
                     "400": {
@@ -380,7 +380,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_conversations.ConversationResponse"
+                            "$ref": "#/definitions/conversations.ConversationResponse"
                         }
                     },
                     "400": {
@@ -689,6 +689,108 @@
                 }
             }
         },
+        "/api/files/upload": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Upload a file (image, document, etc.) and return the file metadata",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "files"
+                ],
+                "summary": "Upload file",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "File to upload",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/files.UploadResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/files/{filename}": {
+            "get": {
+                "description": "Retrieve an uploaded file by filename",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "files"
+                ],
+                "summary": "Get file",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filename",
+                        "name": "filename",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/messages/{id}": {
             "delete": {
                 "security": [
@@ -835,7 +937,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_notifications.NotificationResponse"
+                                "$ref": "#/definitions/notifications.NotificationResponse"
                             }
                         }
                     },
@@ -1014,7 +1116,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/internal_users.UserResponse"
+                                "$ref": "#/definitions/users.UserResponse"
                             }
                         }
                     },
@@ -1052,7 +1154,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_users.UserResponse"
+                            "$ref": "#/definitions/users.UserResponse"
                         }
                     },
                     "400": {
@@ -1107,7 +1209,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/internal_users.UserResponse"
+                            "$ref": "#/definitions/users.UserResponse"
                         }
                     },
                     "400": {
@@ -1133,18 +1235,18 @@
         }
     },
     "definitions": {
-        "internal_auth.AuthResponse": {
+        "auth.AuthResponse": {
             "type": "object",
             "properties": {
                 "token": {
-                    "$ref": "#/definitions/internal_auth.TokenPair"
+                    "$ref": "#/definitions/auth.TokenPair"
                 },
                 "user": {
-                    "$ref": "#/definitions/internal_auth.UserResponse"
+                    "$ref": "#/definitions/auth.UserResponse"
                 }
             }
         },
-        "internal_auth.LoginRequest": {
+        "auth.LoginRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -1155,7 +1257,7 @@
                 }
             }
         },
-        "internal_auth.RefreshRequest": {
+        "auth.RefreshRequest": {
             "type": "object",
             "properties": {
                 "refresh_token": {
@@ -1163,7 +1265,7 @@
                 }
             }
         },
-        "internal_auth.RegisterRequest": {
+        "auth.RegisterRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -1177,7 +1279,7 @@
                 }
             }
         },
-        "internal_auth.TokenPair": {
+        "auth.TokenPair": {
             "type": "object",
             "properties": {
                 "access_token": {
@@ -1191,7 +1293,7 @@
                 }
             }
         },
-        "internal_auth.UserResponse": {
+        "auth.UserResponse": {
             "type": "object",
             "properties": {
                 "avatar_url": {
@@ -1214,7 +1316,7 @@
                 }
             }
         },
-        "internal_conversations.ConversationResponse": {
+        "conversations.ConversationResponse": {
             "type": "object",
             "properties": {
                 "admin_id": {
@@ -1235,7 +1337,7 @@
                 "members": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/internal_conversations.MemberResponse"
+                        "$ref": "#/definitions/conversations.MemberResponse"
                     }
                 },
                 "name": {
@@ -1249,7 +1351,7 @@
                 }
             }
         },
-        "internal_conversations.MemberResponse": {
+        "conversations.MemberResponse": {
             "type": "object",
             "properties": {
                 "joined_at": {
@@ -1266,7 +1368,47 @@
                 }
             }
         },
-        "internal_notifications.NotificationResponse": {
+        "files.AttachmentResponse": {
+            "type": "object",
+            "properties": {
+                "file_name": {
+                    "type": "string"
+                },
+                "file_size": {
+                    "type": "integer"
+                },
+                "file_type": {
+                    "type": "string"
+                },
+                "file_url": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
+        "files.UploadResponse": {
+            "type": "object",
+            "properties": {
+                "attachment": {
+                    "$ref": "#/definitions/files.AttachmentResponse"
+                },
+                "file_name": {
+                    "type": "string"
+                },
+                "file_size": {
+                    "type": "integer"
+                },
+                "file_type": {
+                    "type": "string"
+                },
+                "file_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "notifications.NotificationResponse": {
             "type": "object",
             "properties": {
                 "content": {
@@ -1289,7 +1431,7 @@
                 }
             }
         },
-        "internal_users.UserResponse": {
+        "users.UserResponse": {
             "type": "object",
             "properties": {
                 "avatar_url": {

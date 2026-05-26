@@ -18,6 +18,7 @@ type Config struct {
 	JWTSecret  string
 	AccessTTL  int // minutes
 	RefreshTTL int // days
+	UploadDir  string
 }
 
 func Load() *Config {
@@ -32,6 +33,7 @@ func Load() *Config {
 		JWTSecret:  getEnv("JWT_SECRET", "super-secret-key-change-in-production"),
 		AccessTTL:  getEnvInt("JWT_ACCESS_TTL", 15), // 15 minutes
 		RefreshTTL: getEnvInt("JWT_REFRESH_TTL", 7), // 7 days
+		UploadDir:  getEnv("UPLOAD_DIR", "./uploads"),
 	}
 	return cfg
 }
