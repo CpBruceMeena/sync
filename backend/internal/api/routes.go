@@ -5,6 +5,7 @@ import (
 
 	"github.com/CpBruceMeena/sync/internal/auth"
 	"github.com/CpBruceMeena/sync/internal/conversations"
+	"github.com/CpBruceMeena/sync/internal/discovery"
 	"github.com/CpBruceMeena/sync/internal/files"
 	"github.com/CpBruceMeena/sync/internal/messages"
 	"github.com/CpBruceMeena/sync/internal/middleware"
@@ -32,6 +33,7 @@ func SetupRoutes(
 	fileHandler *files.Handler,
 	wsHandler *websocket.WsHandler,
 	authService *auth.Service,
+	discoveryHandler *discovery.Handler,
 ) *chi.Mux {
 	r := chi.NewRouter()
 
@@ -68,6 +70,7 @@ func SetupRoutes(
 		registerConversationRoutes(r, conversationsHandler, messagesHandler, reactionsHandler)
 		registerNotificationRoutes(r, notificationsHandler)
 		registerFileRoutes(r, fileHandler)
+		registerDiscoveryRoutes(r, discoveryHandler)
 	})
 
 	// Swagger documentation

@@ -90,11 +90,12 @@ func (s *Service) CreatePrivateConversation(ctx context.Context, userID uuid.UUI
 }
 
 // CreateGroupConversation creates a group conversation
-func (s *Service) CreateGroupConversation(ctx context.Context, userID uuid.UUID, name string, memberUsernames []string) (*ConversationResponse, error) {
+func (s *Service) CreateGroupConversation(ctx context.Context, userID uuid.UUID, name string, memberUsernames []string, isPublic bool) (*ConversationResponse, error) {
 	conv := &models.Conversation{
-		Type:    "group",
-		Name:    name,
-		AdminID: &userID,
+		Type:     "group",
+		Name:     name,
+		AdminID:  &userID,
+		IsPublic: isPublic,
 	}
 	if err := s.repos.Conversations.Create(ctx, conv); err != nil {
 		return nil, err
@@ -167,6 +168,7 @@ func convToResponse(conv models.Conversation) ConversationResponse {
 		Type:      conv.Type,
 		Name:      conv.Name,
 		AdminID:   conv.AdminID,
+		IsPublic:  conv.IsPublic,
 		CreatedAt: conv.CreatedAt,
 		UpdatedAt: conv.UpdatedAt,
 	}

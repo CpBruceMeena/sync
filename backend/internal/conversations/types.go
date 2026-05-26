@@ -17,6 +17,7 @@ type ConversationResponse struct {
 	Type               string           `json:"type"`
 	Name               string           `json:"name"`
 	AdminID            *uuid.UUID       `json:"admin_id"`
+	IsPublic           bool             `json:"is_public"`
 	CreatedAt          time.Time        `json:"created_at"`
 	UpdatedAt          time.Time        `json:"updated_at"`
 	Members            []MemberResponse `json:"members,omitempty"`
@@ -34,9 +35,10 @@ type MemberResponse struct {
 
 // CreateConversationRequest represents a create conversation request body
 type CreateConversationRequest struct {
-	Type    string   `json:"type"`
-	Name    string   `json:"name"`
-	Members []string `json:"members"`
+	Type     string   `json:"type"`
+	Name     string   `json:"name"`
+	Members  []string `json:"members"`
+	IsPublic bool     `json:"is_public"`
 }
 
 // AddMemberRequest represents an add member request body

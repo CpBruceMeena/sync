@@ -23,6 +23,7 @@ export interface Conversation {
   type: "private" | "group";
   name: string;
   admin_id: string | null;
+  is_public: boolean;
   created_at: string;
   updated_at: string;
   members?: ConversationMember[];
@@ -86,4 +87,30 @@ export interface Notification {
   content: string;
   is_read: boolean;
   created_at: string;
+}
+
+// Discovery types
+export interface UserResult {
+  id: string;
+  username: string;
+  display_name: string;
+  avatar_url: string;
+  status: string;
+}
+
+export interface GroupMember {
+  user_id: string;
+  username: string;
+  role: "admin" | "member";
+  joined_at: string;
+}
+
+export interface GroupDetail {
+  id: string;
+  name: string;
+  admin_id: string | null;
+  created_at: string;
+  updated_at: string;
+  member_count: number;
+  members?: GroupMember[];
 }

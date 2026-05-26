@@ -15,6 +15,7 @@ import (
 	"github.com/CpBruceMeena/sync/internal/config"
 	"github.com/CpBruceMeena/sync/internal/conversations"
 	"github.com/CpBruceMeena/sync/internal/database"
+	"github.com/CpBruceMeena/sync/internal/discovery"
 	"github.com/CpBruceMeena/sync/internal/files"
 	"github.com/CpBruceMeena/sync/internal/messages"
 	"github.com/CpBruceMeena/sync/internal/notifications"
@@ -32,6 +33,11 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
+
+	// Run database migrations
+	if err := database.RunMigrations(db.DB); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
 
 	repos := repository.NewRepositories(db.DB)
 
@@ -61,6 +67,10 @@ func main() {
 	fileSvc := files.NewService(repos, cfg.UploadDir)
 	fileHandler := files.NewHandler(fileSvc, cfg.UploadDir)
 
+	// Discovery service
+	discoverySvc := discovery.NewService(repos)
+	discoveryHandler := discovery.NewHandler(discoverySvc)
+
 	// All routes are defined in internal/api/routes.go
 	r := api.SetupRoutes(
 		authHandler,
@@ -72,6 +82,7 @@ func main() {
 		fileHandler,
 		wsHandler,
 		authService,
+		discoveryHandler,
 	)
 
 	addr := fmt.Sprintf(":%d", cfg.ServerPort)
