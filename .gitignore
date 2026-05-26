@@ -89,9 +89,6 @@ crg-cache/
 .next/
 next-env.d.ts
 
-# Screenshots
-screenshots/
-
 # Media files
 *.mp4
 *.mov
@@ -102,3 +99,7 @@ medium-article.md
 
 # Go vendor (go.mod manages dependencies)
 vendor/
+.gstack/
+
+# Test credentials (plaintext passwords, never commit)
+backend/scripts/test-credentials.txt
