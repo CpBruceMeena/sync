@@ -100,3 +100,6 @@ medium-article.md
 # Go vendor (go.mod manages dependencies)
 vendor/
 .gstack/
+
+# Test credentials (plaintext passwords, never commit)
+backend/scripts/test-credentials.txt
