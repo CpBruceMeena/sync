@@ -108,6 +108,65 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	httputil.RespondJSON(w, http.StatusCreated, msg)
 }
 
+// SearchMessages searches messages within a conversation by content
+// @Summary Search messages
+// @Description Search messages within a conversation
+// @Tags messages
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Conversation ID"
+// @Param q query string true "Search query"
+// @Param limit query int false "Number of results (max 100)" default(50)
+// @Param offset query int false "Offset for pagination" default(0)
+// @Success 200 {array} map[string]interface{}
+// @Failure 400 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /api/conversations/{id}/search [get]
+func (h *Handler) SearchMessages(w http.ResponseWriter, r *http.Request) {
+	convIDStr := chi.URLParam(r, "id")
+	convID, err := uuid.Parse(convIDStr)
+	if err != nil {
+		httputil.RespondError(w, http.StatusBadRequest, "Invalid conversation ID")
+		return
+	}
+
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		httputil.RespondError(w, http.StatusBadRequest, "Query parameter 'q' is required")
+		return
+	}
+
+	limitStr := r.URL.Query().Get("limit")
+	limit := 50
+	if limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+			limit = l
+		}
+	}
+
+	offsetStr := r.URL.Query().Get("offset")
+	offset := 0
+	if offsetStr != "" {
+		if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
+			offset = o
+		}
+	}
+
+	msgs, err := h.service.SearchMessages(r.Context(), convID, query, limit, offset)
+	if err != nil {
+		log.Printf("Error searching messages: %v", err)
+		httputil.RespondError(w, http.StatusInternalServerError, "Failed to search messages")
+		return
+	}
+
+	if msgs == nil {
+		msgs = []MessageResponse{}
+	}
+
+	httputil.RespondJSON(w, http.StatusOK, msgs)
+}
+
 // DeleteMessage deletes a message
 // @Summary Delete message
 // @Description Delete a message by its ID (only the sender can delete)

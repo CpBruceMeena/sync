@@ -19,6 +19,11 @@ export default function ChatPage() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [showOtherProfile, setShowOtherProfile] = useState(false);
   const [otherUserProfile, setOtherUserProfile] = useState<UserType | null>(null);
+  const [searchMode, setSearchMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Message[]>([]);
+  const [searching, setSearching] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new messages
@@ -138,6 +143,46 @@ export default function ChatPage() {
       unsubRemoved();
     };
   }, [selectedConv, subscribe]);
+
+  // Close search when conversation changes
+  useEffect(() => {
+    setSearchMode(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    setSearching(false);
+  }, [selectedConv]);
+
+  // Debounced search
+  useEffect(() => {
+    if (!searchMode || !searchQuery.trim() || !selectedConv) {
+      setSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setSearching(true);
+      api.searchMessages(selectedConv.id, searchQuery.trim(), 50)
+        .then((results) => setSearchResults(results))
+        .catch(() => setSearchResults([]))
+        .finally(() => setSearching(false));
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [searchMode, searchQuery, selectedConv]);
+
+  const scrollToMessage = useCallback((messageId: string) => {
+    setSearchMode(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    setTimeout(() => {
+      const el = document.getElementById(`msg-${messageId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        el.classList.add("highlight-flash");
+        setTimeout(() => el.classList.remove("highlight-flash"), 2000);
+      }
+    }, 100);
+  }, []);
 
   const handleReact = useCallback(
     async (messageId: string, emoji: string) => {
@@ -289,49 +334,137 @@ export default function ChatPage() {
     <div className="flex-1 flex flex-col min-w-0">
       {/* Chat header */}
       <div className="glass px-6 py-3 flex items-center gap-3 border-b border-[var(--border)]">
-        <div className="relative">
-          <div
-            onClick={() => {
-              if (selectedConv.type === "private") {
-                const otherMember = selectedConv.members?.find((m) => m.user_id !== user?.id);
-                if (otherMember) {
-                  api.getUser(otherMember.user_id).then((u) => {
-                    setOtherUserProfile(u);
-                    setShowOtherProfile(true);
-                  }).catch(() => {});
-                }
-              }
-            }}
-            className={`w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center text-white font-semibold text-sm ${selectedConv.type === "private" ? "cursor-pointer hover:opacity-80" : ""} transition-opacity`}
-          >
-            {selectedConv.name
-              ? selectedConv.name.charAt(0).toUpperCase()
-              : selectedConv.members?.find((m) => m.user_id !== user?.id)
-                  ?.username?.charAt(0)
-                  .toUpperCase() || "?"}
-          </div>
-          {onlineUsers.some(
-            (u) =>
-              u.user_id ===
-              selectedConv.members?.find((m) => m.user_id !== user?.id)?.user_id
-          ) && (
-            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[var(--online)] border-2 border-[var(--surface)]" />
-          )}
-        </div>
-        <div className="flex-1 min-w-0">
-          <h2 className="text-sm font-semibold text-[var(--foreground)] truncate">
-            {selectedConv.name ||
-              selectedConv.members?.find((m) => m.user_id !== user?.id)
-                ?.username ||
-              "Unknown"}
-          </h2>
-          <p className="text-xs text-[var(--text-muted)]">
-            {selectedConv.type === "group"
-              ? `${selectedConv.members?.length || 0} members`
-              : "Private conversation"}
-          </p>
-        </div>
+        {searchMode ? (
+          <>
+            <button
+              onClick={() => { setSearchMode(false); setSearchQuery(""); setSearchResults([]); }}
+              className="flex-shrink-0 p-1.5 rounded-lg hover:bg-[var(--surface-3)] transition-colors text-[var(--text-muted)]"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div className="relative flex-1">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    setSearchMode(false);
+                    setSearchQuery("");
+                    setSearchResults([]);
+                  }
+                }}
+                placeholder="Search messages..."
+                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-[var(--surface-3)] border border-[var(--border)] text-sm text-[var(--foreground)] placeholder:text-[var(--text-muted)] outline-none focus:ring-2 focus:ring-[var(--primary)]/50 transition-all"
+                autoFocus
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="relative">
+              <div
+                onClick={() => {
+                  if (selectedConv.type === "private") {
+                    const otherMember = selectedConv.members?.find((m) => m.user_id !== user?.id);
+                    if (otherMember) {
+                      api.getUser(otherMember.user_id).then((u) => {
+                        setOtherUserProfile(u);
+                        setShowOtherProfile(true);
+                      }).catch(() => {});
+                    }
+                  }
+                }}
+                className={`w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center text-white font-semibold text-sm ${selectedConv.type === "private" ? "cursor-pointer hover:opacity-80" : ""} transition-opacity`}
+              >
+                {selectedConv.name
+                  ? selectedConv.name.charAt(0).toUpperCase()
+                  : selectedConv.members?.find((m) => m.user_id !== user?.id)
+                      ?.username?.charAt(0)
+                      .toUpperCase() || "?"}
+              </div>
+              {onlineUsers.some(
+                (u) =>
+                  u.user_id ===
+                  selectedConv.members?.find((m) => m.user_id !== user?.id)?.user_id
+              ) && (
+                <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[var(--online)] border-2 border-[var(--surface)]" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-sm font-semibold text-[var(--foreground)] truncate">
+                {selectedConv.name ||
+                  selectedConv.members?.find((m) => m.user_id !== user?.id)
+                    ?.username ||
+                  "Unknown"}
+              </h2>
+              <p className="text-xs text-[var(--text-muted)]">
+                {selectedConv.type === "group"
+                  ? `${selectedConv.members?.length || 0} members`
+                  : "Private conversation"}
+              </p>
+            </div>
+            <button
+              onClick={() => { setSearchMode(true); setTimeout(() => searchInputRef.current?.focus(), 50); }}
+              className="flex-shrink-0 p-2 rounded-lg hover:bg-[var(--surface-3)] transition-colors text-[var(--text-muted)]"
+              title="Search messages"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </button>
+          </>
+        )}
       </div>
+
+      {/* Search results */}
+      {searchMode && (searchQuery.trim() || searchResults.length > 0) && (
+        <div className="border-b border-[var(--border)] bg-[var(--surface-2)] max-h-48 overflow-y-auto">
+          {searching ? (
+            <div className="flex items-center justify-center py-4">
+              <div className="w-5 h-5 rounded-full border-2 border-[var(--primary)] border-t-transparent animate-spin" />
+            </div>
+          ) : searchResults.length > 0 ? (
+            <div className="py-1">
+              <p className="px-4 py-1.5 text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider">
+                {searchResults.length} result{searchResults.length !== 1 ? "s" : ""}
+              </p>
+              {searchResults.map((result) => (
+                <button
+                  key={result.id}
+                  onClick={() => scrollToMessage(result.id)}
+                  className="w-full flex items-start gap-2 px-4 py-2 hover:bg-[var(--surface-3)] transition-colors text-left"
+                >
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0">
+                    {result.sender_username?.charAt(0).toUpperCase() || "?"}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-[var(--foreground)]">{result.sender_username}</span>
+                      <span className="text-[10px] text-[var(--text-muted)]">
+                        {new Date(result.created_at).toLocaleDateString([], { month: "short", day: "numeric" })}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">
+                      <HighlightText text={result.content} query={searchQuery.trim()} />
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : searchQuery.trim().length >= 1 ? (
+            <div className="flex items-center justify-center py-4">
+              <p className="text-xs text-[var(--text-muted)]">No messages found</p>
+            </div>
+          ) : null}
+        </div>
+      )}
 
       {/* Messages */}
       <div ref={messagesRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-0.5 smooth-scroll">
@@ -354,7 +487,7 @@ export default function ChatPage() {
               })();
 
               return (
-                <motion.div key={msg.id}>
+                <motion.div key={msg.id} id={`msg-${msg.id}`}>
                   {showDateSeparator && (
                     <DateSeparator createdAt={msg.created_at} />
                   )}
@@ -429,6 +562,26 @@ function DateSeparator({ createdAt }: { createdAt: string }) {
       </span>
       <div className="flex-1 h-px bg-[var(--border)]" />
     </div>
+  );
+}
+
+// HighlightText highlights occurrences of a query string within text
+function HighlightText({ text, query }: { text: string; query: string }) {
+  if (!query.trim()) {
+    return <>{text}</>;
+  }
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const parts = text.split(new RegExp(`(${escaped})`, "gi"));
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === query.toLowerCase() ? (
+          <span key={i} className="bg-[var(--primary)]/30 text-[var(--foreground)] font-medium rounded">{part}</span>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
   );
 }
 

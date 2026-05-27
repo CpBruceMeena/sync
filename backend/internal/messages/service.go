@@ -188,6 +188,86 @@ func (s *Service) notifyMembers(ctx context.Context, senderID, convID uuid.UUID,
 	}
 }
 
+// SearchMessages searches messages within a conversation by content
+func (s *Service) SearchMessages(ctx context.Context, convID uuid.UUID, query string, limit, offset int) ([]MessageResponse, error) {
+	messages, err := s.repos.Messages.SearchByConversation(ctx, convID, query, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetch read receipts for the conversation
+	reads, _ := s.repos.MessageRead.GetByConversation(ctx, convID)
+
+	response := make([]MessageResponse, 0, len(messages))
+	for _, msg := range messages {
+		sender, err := s.repos.Users.GetByID(ctx, msg.SenderID)
+		senderUsername := ""
+		if err == nil && sender != nil {
+			senderUsername = sender.Username
+		}
+
+		// Fetch reactions for this message
+		reactions, _ := s.repos.Messages.GetReactionsByMessage(ctx, msg.ID)
+		reactionResponses := make([]ReactionResponse, 0, len(reactions))
+		for _, rxn := range reactions {
+			user, err := s.repos.Users.GetByID(ctx, rxn.UserID)
+			rxnUsername := ""
+			if err == nil && user != nil {
+				rxnUsername = user.Username
+			}
+			reactionResponses = append(reactionResponses, ReactionResponse{
+				UserID:   rxn.UserID.String(),
+				Username: rxnUsername,
+				Emoji:    rxn.Emoji,
+			})
+		}
+
+		// Fetch attachments for this message
+		attachments, _ := s.repos.Attachments.GetByMessageID(ctx, msg.ID)
+		attachmentResponses := make([]AttachmentResponse, 0, len(attachments))
+		for _, att := range attachments {
+			attachmentResponses = append(attachmentResponses, AttachmentResponse{
+				ID:       att.ID,
+				FileURL:  att.FileUrl,
+				FileType: att.FileType,
+				FileName: att.FileName,
+				FileSize: att.FileSize,
+			})
+		}
+
+		// Compute who has read this message
+		readBy := make([]ReadReceiptInfo, 0)
+		for _, read := range reads {
+			if !read.LastReadAt.Before(msg.CreatedAt) {
+				username := ""
+				if user, err := s.repos.Users.GetByID(ctx, read.UserID); err == nil && user != nil {
+					username = user.Username
+				}
+				readBy = append(readBy, ReadReceiptInfo{
+					UserID:   read.UserID.String(),
+					Username: username,
+					ReadAt:   read.LastReadAt.Format("2006-01-02T15:04:05Z07:00"),
+				})
+			}
+		}
+
+		response = append(response, MessageResponse{
+			ID:             msg.ID,
+			ConversationID: msg.ConversationID,
+			SenderID:       msg.SenderID,
+			SenderUsername: senderUsername,
+			Content:        msg.Content,
+			Type:           msg.Type,
+			CreatedAt:      msg.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			Reactions:      reactionResponses,
+			Attachments:    attachmentResponses,
+			ReadBy:         readBy,
+		})
+	}
+
+	return response, nil
+}
+
 // DeleteMessage deletes a message by ID
 func (s *Service) DeleteMessage(ctx context.Context, msgID, userID uuid.UUID) error {
 	return s.repos.Messages.Delete(ctx, msgID, userID)

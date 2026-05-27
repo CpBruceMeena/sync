@@ -16,6 +16,7 @@ func registerConversationRoutes(r chi.Router, ch *conversations.Handler, mh *mes
 	r.Delete("/api/conversations/{id}/members/{userId}", ch.RemoveMember)
 	r.Get("/api/conversations/{id}/messages", mh.ListMessages)
 	r.Post("/api/conversations/{id}/messages", mh.SendMessage)
+	r.Get("/api/conversations/{id}/search", mh.SearchMessages)
 	r.Delete("/api/messages/{id}", mh.DeleteMessage)
 	r.Post("/api/messages/{id}/reactions", rh.ToggleReaction)
 }

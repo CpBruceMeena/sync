@@ -165,6 +165,12 @@ export const api = {
       ? filename
       : `${API_BASE}/api/files/${filename}`,
 
+  // Message Search
+  searchMessages: (conversationId: string, q: string, limit = 50, offset = 0) =>
+    request<import("../types").Message[]>(
+      `/api/conversations/${conversationId}/search?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`
+    ),
+
   // Discovery
   searchUsers: (q: string, limit = 20) =>
     request<import("../types").UserResult[]>(`/api/discovery/users?q=${encodeURIComponent(q)}&limit=${limit}`),

@@ -60,3 +60,14 @@ func (r *messageRepository) GetReactionsByMessage(ctx context.Context, messageID
 	err := r.db.WithContext(ctx).Where("message_id = ?", messageID).Find(&reactions).Error
 	return reactions, err
 }
+
+func (r *messageRepository) SearchByConversation(ctx context.Context, convID uuid.UUID, query string, limit, offset int) ([]models.Message, error) {
+	var msgs []models.Message
+	err := r.db.WithContext(ctx).
+		Where("conversation_id = ? AND content ILIKE ?", convID, "%"+query+"%").
+		Order("created_at DESC").
+		Limit(limit).
+		Offset(offset).
+		Find(&msgs).Error
+	return msgs, err
+}
