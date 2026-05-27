@@ -25,6 +25,7 @@ func (s *Service) SearchUsers(ctx context.Context, query string, limit int) ([]U
 			Username:    u.Username,
 			DisplayName: u.DisplayName,
 			AvatarURL:   u.AvatarUrl,
+			Bio:         u.Bio,
 			Status:      u.Status,
 		})
 	}

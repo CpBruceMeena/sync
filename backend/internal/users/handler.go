@@ -85,7 +85,7 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.service.UpdateProfile(r.Context(), userID, req.DisplayName, req.AvatarURL, req.Status)
+	user, err := h.service.UpdateProfile(r.Context(), userID, req.DisplayName, req.AvatarURL, req.Status, req.Bio)
 	if err != nil {
 		log.Printf("Error updating user: %v", err)
 		httputil.RespondError(w, http.StatusInternalServerError, "Failed to update profile")

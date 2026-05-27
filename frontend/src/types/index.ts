@@ -5,6 +5,14 @@ export interface User {
   display_name: string;
   avatar_url: string;
   status: string;
+  bio: string;
+}
+
+export interface ProfileUpdate {
+  display_name?: string;
+  avatar_url?: string;
+  status?: string;
+  bio?: string;
 }
 
 export interface TokenPair {

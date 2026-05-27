@@ -12,7 +12,7 @@ import type { Message, MessageReaction, WSMessage } from "@/types";
 
 export default function ChatPage() {
   const { user } = useAuth();
-  const { subscribe, sendMessage, onlineUsers } = useWebSocket();
+  const { subscribe, onlineUsers } = useWebSocket();
   const { selectedConv } = useSelectedConv();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -34,17 +34,22 @@ export default function ChatPage() {
     if (!selectedConv) return;
 
     const unsub = subscribe("new_message", (data: WSMessage) => {
-      if (data.conversation_id === selectedConv.id && data.content) {
-        const newMsg: Message = {
-          id: data.message_id || "",
-          conversation_id: data.conversation_id || "",
-          sender_id: data.sender_id || "",
-          sender_username: data.sender_username || "",
-          content: data.content,
-          type: "text",
-          created_at: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, newMsg]);
+      if (data.conversation_id === selectedConv.id && data.content && data.message_id) {
+        setMessages((prev) => {
+          const msgId = data.message_id || "";
+          // Deduplicate: skip if message already exists (avoids double-add from broadcast-to-all)
+          if (prev.some((m) => m.id === msgId)) return prev;
+          const newMsg: Message = {
+            id: msgId,
+            conversation_id: data.conversation_id || "",
+            sender_id: data.sender_id || "",
+            sender_username: data.sender_username || "",
+            content: data.content || "",
+            type: "text",
+            created_at: new Date().toISOString(),
+          };
+          return [...prev, newMsg];
+        });
       }
     });
 
@@ -116,20 +121,12 @@ export default function ChatPage() {
         setMessages((prev) =>
           prev.map((m) => (m.id === tempId ? msg : m))
         );
-
-        // Broadcast via WebSocket
-        sendMessage({
-          type: "new_message",
-          conversation_id: selectedConv.id,
-          content,
-          message_id: msg.id,
-        });
       } catch (err) {
         console.error("Failed to send message:", err);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
       }
     },
-    [selectedConv, user, sendMessage]
+    [selectedConv, user]
   );
 
   const handleSendFile = useCallback(
@@ -187,20 +184,12 @@ export default function ChatPage() {
         setMessages((prev) =>
           prev.map((m) => (m.id === tempId ? updatedMsg : m))
         );
-
-        // Broadcast via WebSocket
-        sendMessage({
-          type: "new_message",
-          conversation_id: selectedConv.id,
-          content: `Sent a file: ${file.name}`,
-          message_id: msg.id,
-        });
       } catch (err) {
         console.error("Failed to send file:", err);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
       }
     },
-    [selectedConv, user, sendMessage]
+    [selectedConv, user]
   );
 
   if (!selectedConv) {
@@ -291,6 +280,7 @@ export default function ChatPage() {
                 <MessageBubble
                   message={msg}
                   isOwn={msg.sender_id === user?.id}
+                  isGroup={selectedConv.type === "group"}
                   userId={user?.id || ""}
                   onReact={handleReact}
                 />
@@ -310,11 +300,13 @@ export default function ChatPage() {
 function MessageBubble({
   message,
   isOwn,
+  isGroup,
   userId,
   onReact,
 }: {
   message: Message;
   isOwn: boolean;
+  isGroup: boolean;
   userId: string;
   onReact: (messageId: string, emoji: string) => void;
 }) {
@@ -344,18 +336,23 @@ function MessageBubble({
 
   return (
     <div
-      className={`flex ${isOwn ? "justify-end" : "justify-start"} mb-2 message-enter`}
+      className={`flex ${isOwn ? "justify-start" : "justify-end"} mb-2 message-enter`}
     >
       <div className="max-w-[70%] flex flex-col gap-1">
         <div
           className={`rounded-2xl px-4 py-2 ${
             isOwn
-              ? "bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-tr-md"
-              : "bg-[var(--surface-2)] border border-[var(--border)] text-[var(--foreground)] rounded-tl-md"
+              ? "bg-[var(--surface-2)] border border-[var(--border)] text-[var(--foreground)] rounded-tl-md"
+              : "bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-tr-md"
           }`}
         >
-          {!isOwn && (
-            <p className="text-xs font-medium text-[var(--accent)] mb-1">
+          {isGroup && isOwn && (
+            <p className="text-xs font-medium text-[var(--text-muted)] mb-1">
+              You
+            </p>
+          )}
+          {isGroup && !isOwn && message.sender_username && (
+            <p className="text-xs font-medium text-[var(--accent-light)] mb-1">
               {message.sender_username}
             </p>
           )}
@@ -417,7 +414,7 @@ function MessageBubble({
           )}
           <p
             className={`text-[10px] mt-1 ${
-              isOwn ? "text-white/60" : "text-[var(--text-muted)]"
+              isOwn ? "text-[var(--text-muted)]" : "text-white/60"
             }`}
           >
             {new Date(message.created_at).toLocaleTimeString([], {

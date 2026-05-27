@@ -16,6 +16,7 @@ func RunMigrations(db *gorm.DB) error {
 			status VARCHAR(20) NOT NULL DEFAULT 'offline',
 			last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);`,
+		`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio VARCHAR(500) NOT NULL DEFAULT '';`,
 	}
 
 	for _, m := range migrations {

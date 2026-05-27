@@ -110,7 +110,7 @@ func TestUsersHandler_ListUsers(t *testing.T) {
 // --- Message Handler Tests ---
 
 func TestMessagesHandler_SendMessageValidation(t *testing.T) {
-	h := messages.NewHandler(messages.NewService(newMockRepos(), nil))
+	h := messages.NewHandler(messages.NewService(newMockRepos(), nil, nil))
 
 	tests := []struct {
 		name       string

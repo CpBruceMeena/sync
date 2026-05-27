@@ -269,7 +269,9 @@ func newMockE2ESuite() *mockE2ESuite {
 	// Wire up the app
 	userSvc := users.NewService(s.repos)
 	notifSvc := notifications.NewService(s.repos)
-	messageSvc := messages.NewService(s.repos, notifSvc)
+	wsHub := websocket.NewHub(s.repos.Presence)
+	go wsHub.Run()
+	messageSvc := messages.NewService(s.repos, notifSvc, wsHub)
 	conversationSvc := conversations.NewService(s.repos, notifSvc)
 
 	authHandler := auth.NewHandler(s.authSvc, s.repos)
@@ -277,8 +279,6 @@ func newMockE2ESuite() *mockE2ESuite {
 	convsHandler := conversations.NewHandler(conversationSvc)
 	msgsHandler := messages.NewHandler(messageSvc)
 	notifHandler := notifications.NewHandler(notifSvc)
-	wsHub := websocket.NewHub(s.repos.Presence)
-	go wsHub.Run()
 	wsHandler := websocket.NewWsHandler(wsHub, s.authSvc, s.repos)
 
 	reactionSvc := reactions.NewService(s.repos, wsHub, notifSvc)

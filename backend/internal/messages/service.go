@@ -2,11 +2,13 @@ package messages
 
 import (
 	"context"
+	"encoding/json"
 	"log"
 
 	"github.com/CpBruceMeena/sync/internal/models"
 	"github.com/CpBruceMeena/sync/internal/notifications"
 	"github.com/CpBruceMeena/sync/internal/repository"
+	"github.com/CpBruceMeena/sync/internal/websocket"
 	"github.com/google/uuid"
 )
 
@@ -14,11 +16,12 @@ import (
 type Service struct {
 	repos        *repository.Repositories
 	notifService *notifications.Service
+	hub          *websocket.Hub
 }
 
 // NewService creates a new message service
-func NewService(repos *repository.Repositories, notifService *notifications.Service) *Service {
-	return &Service{repos: repos, notifService: notifService}
+func NewService(repos *repository.Repositories, notifService *notifications.Service, hub *websocket.Hub) *Service {
+	return &Service{repos: repos, notifService: notifService, hub: hub}
 }
 
 // ListMessages returns paginated messages with sender info and reactions
@@ -97,6 +100,13 @@ func (s *Service) SendMessage(ctx context.Context, senderID uuid.UUID, convID uu
 		return nil, err
 	}
 
+	// Get sender username for broadcast
+	senderUsername := ""
+	sender, err := s.repos.Users.GetByID(ctx, senderID)
+	if err == nil && sender != nil {
+		senderUsername = sender.Username
+	}
+
 	// Create attachment record if provided
 	if attachment != nil {
 		att := &models.Attachment{
@@ -108,6 +118,22 @@ func (s *Service) SendMessage(ctx context.Context, senderID uuid.UUID, convID uu
 		}
 		if err := s.repos.Attachments.Create(ctx, att); err != nil {
 			log.Printf("Failed to save attachment for message %s: %v", msg.ID, err)
+		}
+	}
+
+	// Broadcast message to conversation room via WebSocket
+	if s.hub != nil {
+		wsMsg := websocket.WSMessage{
+			Type:           websocket.TypeNewMessage,
+			ConversationID: convID,
+			SenderID:       senderID,
+			SenderUsername: senderUsername,
+			Content:        content,
+			MessageID:      msg.ID,
+		}
+		data, err := json.Marshal(wsMsg)
+		if err == nil {
+			s.hub.BroadcastToRoom(convID, data, uuid.Nil) // uuid.Nil = send to ALL including sender
 		}
 	}
 

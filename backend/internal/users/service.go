@@ -3,6 +3,7 @@ package users
 import (
 	"context"
 
+	"github.com/CpBruceMeena/sync/internal/models"
 	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/google/uuid"
 )
@@ -17,6 +18,18 @@ func NewService(repos *repository.Repositories) *Service {
 	return &Service{repos: repos}
 }
 
+func userToResponse(u models.User) UserResponse {
+	return UserResponse{
+		ID:          u.ID,
+		Username:    u.Username,
+		Email:       u.Email,
+		DisplayName: u.DisplayName,
+		AvatarURL:   u.AvatarUrl,
+		Status:      u.Status,
+		Bio:         u.Bio,
+	}
+}
+
 // ListUsers returns all registered users
 func (s *Service) ListUsers(ctx context.Context) ([]UserResponse, error) {
 	users, err := s.repos.Users.List(ctx)
@@ -26,14 +39,7 @@ func (s *Service) ListUsers(ctx context.Context) ([]UserResponse, error) {
 
 	response := make([]UserResponse, 0, len(users))
 	for _, u := range users {
-		response = append(response, UserResponse{
-			ID:          u.ID,
-			Username:    u.Username,
-			Email:       u.Email,
-			DisplayName: u.DisplayName,
-			AvatarURL:   u.AvatarUrl,
-			Status:      u.Status,
-		})
+		response = append(response, userToResponse(u))
 	}
 	return response, nil
 }
@@ -45,18 +51,12 @@ func (s *Service) GetUser(ctx context.Context, userID uuid.UUID) (*UserResponse,
 		return nil, err
 	}
 
-	return &UserResponse{
-		ID:          user.ID,
-		Username:    user.Username,
-		Email:       user.Email,
-		DisplayName: user.DisplayName,
-		AvatarURL:   user.AvatarUrl,
-		Status:      user.Status,
-	}, nil
+	resp := userToResponse(*user)
+	return &resp, nil
 }
 
 // UpdateProfile updates a user's profile fields
-func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, displayName, avatarURL, status string) (*UserResponse, error) {
+func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, displayName, avatarURL, status, bio string) (*UserResponse, error) {
 	user, err := s.repos.Users.GetByID(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -71,16 +71,13 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, displayNa
 	if status != "" {
 		user.Status = status
 	}
+	if bio != "" {
+		user.Bio = bio
+	}
 	if err := s.repos.Users.Update(ctx, user); err != nil {
 		return nil, err
 	}
 
-	return &UserResponse{
-		ID:          user.ID,
-		Username:    user.Username,
-		Email:       user.Email,
-		DisplayName: user.DisplayName,
-		AvatarURL:   user.AvatarUrl,
-		Status:      user.Status,
-	}, nil
+	resp := userToResponse(*user)
+	return &resp, nil
 }
