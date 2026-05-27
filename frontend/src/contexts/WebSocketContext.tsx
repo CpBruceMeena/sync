@@ -11,13 +11,13 @@ import React, {
 } from "react";
 import { getWSClient, WSClient } from "@/lib/websocket";
 import { useAuth } from "./AuthContext";
-import type { WSMessage } from "@/types";
+import type { WSMessage, PresenceInfo } from "@/types";
 
 interface WebSocketContextType {
   isConnected: boolean;
   sendMessage: (msg: Record<string, any>) => void;
   subscribe: (type: string, handler: (data: WSMessage) => void) => () => void;
-  onlineUsers: string[];
+  onlineUsers: PresenceInfo[];
 }
 
 const WebSocketContext = createContext<WebSocketContextType | undefined>(
@@ -27,7 +27,7 @@ const WebSocketContext = createContext<WebSocketContextType | undefined>(
 export function WebSocketProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
-  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [onlineUsers, setOnlineUsers] = useState<PresenceInfo[]>([]);
   const clientRef = useRef<WSClient | null>(null);
 
   useEffect(() => {

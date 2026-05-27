@@ -53,7 +53,7 @@ export function Sidebar() {
     setSelectedConv(conv);
   };
 
-  const isUserOnline = (userId: string) => onlineUsers.includes(userId);
+  const isUserOnline = (userId: string) => onlineUsers.some((u) => u.user_id === userId);
 
   return (
     <>
