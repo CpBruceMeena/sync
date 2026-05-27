@@ -183,6 +183,7 @@ type mockMsgRepo struct {
 	addReactionFn    func(ctx context.Context, reaction *models.Reaction) error
 	removeReactionFn func(ctx context.Context, messageID, userID uuid.UUID, emoji string) error
 	getReactionsFn   func(ctx context.Context, messageID uuid.UUID) ([]models.Reaction, error)
+	searchByConvFn   func(ctx context.Context, convID uuid.UUID, query string, limit, offset int) ([]models.Message, error)
 }
 
 func (m *mockMsgRepo) Create(ctx context.Context, msg *models.Message) error {
@@ -224,6 +225,12 @@ func (m *mockMsgRepo) RemoveReaction(ctx context.Context, messageID, userID uuid
 func (m *mockMsgRepo) GetReactionsByMessage(ctx context.Context, messageID uuid.UUID) ([]models.Reaction, error) {
 	if m.getReactionsFn != nil {
 		return m.getReactionsFn(ctx, messageID)
+	}
+	return nil, nil
+}
+func (m *mockMsgRepo) SearchByConversation(ctx context.Context, convID uuid.UUID, query string, limit, offset int) ([]models.Message, error) {
+	if m.searchByConvFn != nil {
+		return m.searchByConvFn(ctx, convID, query, limit, offset)
 	}
 	return nil, nil
 }

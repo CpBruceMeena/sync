@@ -74,7 +74,7 @@ export default function ChatPage() {
             sender_username: data.sender_username || "",
             content: data.content || "",
             type: "text",
-            created_at: new Date().toISOString(),
+            created_at: data.data || new Date().toISOString(),
           };
           return [...prev, newMsg];
         });
@@ -624,14 +624,14 @@ function MessageBubble({
 
   return (
     <div
-      className={`flex ${isOwn ? "justify-start" : "justify-end"} message-enter w-full`}
+      className={`flex ${isOwn ? "justify-end" : "justify-start"} message-enter w-full`}
     >
       <div className="max-w-[70%] flex flex-col gap-1">
         <div
           className={`rounded-2xl px-4 py-2 ${
             isOwn
-              ? "bg-[var(--surface-2)] border border-[var(--border)] text-[var(--foreground)] rounded-tl-md"
-              : "bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-tr-md"
+              ? "bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-tr-md"
+              : "bg-[var(--surface-2)] border border-[var(--border)] text-[var(--foreground)] rounded-tl-md"
           }`}
         >
           {isGroup && isOwn && (
