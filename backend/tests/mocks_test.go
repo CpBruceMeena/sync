@@ -331,6 +331,31 @@ func (m *mockAttachmentRepo) GetByMessageID(ctx context.Context, messageID uuid.
 	return nil, nil
 }
 
+type mockPresenceRepo struct {
+	upsertFn      func(ctx context.Context, presence *models.Presence) error
+	getByUserIDFn func(ctx context.Context, userID uuid.UUID) (*models.Presence, error)
+	getOnlineFn   func(ctx context.Context) ([]models.Presence, error)
+}
+
+func (m *mockPresenceRepo) Upsert(ctx context.Context, presence *models.Presence) error {
+	if m.upsertFn != nil {
+		return m.upsertFn(ctx, presence)
+	}
+	return nil
+}
+func (m *mockPresenceRepo) GetByUserID(ctx context.Context, userID uuid.UUID) (*models.Presence, error) {
+	if m.getByUserIDFn != nil {
+		return m.getByUserIDFn(ctx, userID)
+	}
+	return nil, nil
+}
+func (m *mockPresenceRepo) GetOnline(ctx context.Context) ([]models.Presence, error) {
+	if m.getOnlineFn != nil {
+		return m.getOnlineFn(ctx)
+	}
+	return nil, nil
+}
+
 // newMockRepos creates a *repository.Repositories with all mock repositories.
 // Default behavior: all methods return zero values (nil, 0, false).
 // Override individual mock functions in test cases to customize behavior.
@@ -342,6 +367,7 @@ func newMockRepos() *repository.Repositories {
 		Sessions:      &mockSessionRepo{},
 		Notifications: &mockNotifRepo{},
 		Attachments:   &mockAttachmentRepo{},
+		Presence:      &mockPresenceRepo{},
 	}
 }
 

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/CpBruceMeena/sync/internal/websocket"
 	"github.com/google/uuid"
 )
@@ -11,8 +12,12 @@ import (
 // mockConn wraps a nil conn for testing purposes
 type mockConn struct{}
 
+func newTestPresenceRepo() repository.PresenceRepository {
+	return &mockPresenceRepo{}
+}
+
 func TestHub_NewHub(t *testing.T) {
-	hub := websocket.NewHub()
+	hub := websocket.NewHub(newTestPresenceRepo())
 	if hub == nil {
 		t.Fatal("NewHub returned nil")
 	}
@@ -21,7 +26,7 @@ func TestHub_NewHub(t *testing.T) {
 }
 
 func TestHub_RegisterAndUnregisterClient(t *testing.T) {
-	hub := websocket.NewHub()
+	hub := websocket.NewHub(newTestPresenceRepo())
 	go hub.Run()
 
 	client := &websocket.Client{
@@ -50,7 +55,7 @@ func TestHub_RegisterAndUnregisterClient(t *testing.T) {
 }
 
 func TestHub_JoinRoom(t *testing.T) {
-	hub := websocket.NewHub()
+	hub := websocket.NewHub(newTestPresenceRepo())
 	go hub.Run()
 
 	client1 := &websocket.Client{
@@ -67,7 +72,7 @@ func TestHub_JoinRoom(t *testing.T) {
 }
 
 func TestHub_LeaveRoom(t *testing.T) {
-	hub := websocket.NewHub()
+	hub := websocket.NewHub(newTestPresenceRepo())
 	go hub.Run()
 
 	client := &websocket.Client{
@@ -85,7 +90,7 @@ func TestHub_LeaveRoom(t *testing.T) {
 }
 
 func TestHub_IsUserOnline(t *testing.T) {
-	hub := websocket.NewHub()
+	hub := websocket.NewHub(newTestPresenceRepo())
 	go hub.Run()
 
 	userID := uuid.New()
@@ -111,7 +116,7 @@ func TestHub_IsUserOnline(t *testing.T) {
 }
 
 func TestHub_GetClient(t *testing.T) {
-	hub := websocket.NewHub()
+	hub := websocket.NewHub(newTestPresenceRepo())
 	go hub.Run()
 
 	userID := uuid.New()
@@ -138,7 +143,7 @@ func TestHub_GetClient(t *testing.T) {
 }
 
 func TestHub_DuplicateRegister(t *testing.T) {
-	hub := websocket.NewHub()
+	hub := websocket.NewHub(newTestPresenceRepo())
 	go hub.Run()
 
 	userID := uuid.New()
@@ -171,7 +176,7 @@ func TestHub_DuplicateRegister(t *testing.T) {
 }
 
 func TestHub_MultipleClientsAndRooms(t *testing.T) {
-	hub := websocket.NewHub()
+	hub := websocket.NewHub(newTestPresenceRepo())
 	go hub.Run()
 
 	// Create multiple clients
