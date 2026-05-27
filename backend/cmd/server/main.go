@@ -56,7 +56,7 @@ func main() {
 	messagesHandler := messages.NewHandler(messageSvc)
 	notifHandler := notifications.NewHandler(notifSvc)
 
-	wsHub := websocket.NewHub()
+	wsHub := websocket.NewHub(repos.Presence)
 	go wsHub.Run()
 	wsHandler := websocket.NewWsHandler(wsHub, authService, repos)
 

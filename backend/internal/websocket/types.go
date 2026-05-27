@@ -9,6 +9,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// PresenceInfo holds user presence data for broadcasting
+type PresenceInfo struct {
+	UserID   uuid.UUID `json:"user_id"`
+	Username string    `json:"username"`
+	Status   string    `json:"status"`
+}
+
 // Message types sent between client and server
 const (
 	TypeNewMessage      = "new_message"
@@ -51,6 +58,7 @@ type WSMessage struct {
 type Client struct {
 	UserID   uuid.UUID
 	Username string
+	Status   string
 	conn     *websocket.Conn
 	Send     chan []byte
 	Hub      *Hub
@@ -58,9 +66,10 @@ type Client struct {
 
 // Hub manages all connected WebSocket clients and room subscriptions
 type Hub struct {
-	clients    map[uuid.UUID]*Client
-	rooms      map[uuid.UUID]map[uuid.UUID]*Client // conversationID -> clients
-	register   chan *Client
-	unregister chan *Client
-	mu         sync.RWMutex
+	clients      map[uuid.UUID]*Client
+	rooms        map[uuid.UUID]map[uuid.UUID]*Client // conversationID -> clients
+	register     chan *Client
+	unregister   chan *Client
+	mu           sync.RWMutex
+	presenceRepo repository.PresenceRepository
 }

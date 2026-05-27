@@ -1,17 +1,22 @@
 package websocket
 
 import (
+	"context"
 	"encoding/json"
+	"time"
 
+	"github.com/CpBruceMeena/sync/internal/models"
+	"github.com/CpBruceMeena/sync/internal/repository"
 	"github.com/google/uuid"
 )
 
-func NewHub() *Hub {
+func NewHub(presenceRepo repository.PresenceRepository) *Hub {
 	return &Hub{
-		clients:    make(map[uuid.UUID]*Client),
-		rooms:      make(map[uuid.UUID]map[uuid.UUID]*Client),
-		register:   make(chan *Client, 256),
-		unregister: make(chan *Client, 256),
+		clients:      make(map[uuid.UUID]*Client),
+		rooms:        make(map[uuid.UUID]map[uuid.UUID]*Client),
+		register:     make(chan *Client, 256),
+		unregister:   make(chan *Client, 256),
+		presenceRepo: presenceRepo,
 	}
 }
 
@@ -20,9 +25,19 @@ func (h *Hub) Run() {
 		select {
 		case client := <-h.register:
 			h.mu.Lock()
+			client.Status = "online"
 			h.clients[client.UserID] = client
 			h.mu.Unlock()
+			// Persist presence
+			if err := h.presenceRepo.Upsert(context.Background(), &models.Presence{
+				UserID:     client.UserID,
+				Status:     "online",
+				LastSeenAt: time.Now(),
+			}); err != nil {
+				// Log but don't block connection
+			}
 			h.BroadcastOnlineUsers()
+			h.BroadcastPresence(client.UserID, client.Username, "online")
 
 		case client := <-h.unregister:
 			h.mu.Lock()
@@ -34,22 +49,35 @@ func (h *Hub) Run() {
 				}
 			}
 			h.mu.Unlock()
+			// Persist offline status
+			if err := h.presenceRepo.Upsert(context.Background(), &models.Presence{
+				UserID:     client.UserID,
+				Status:     "offline",
+				LastSeenAt: time.Now(),
+			}); err != nil {
+				// Log but don't block
+			}
 			h.BroadcastOnlineUsers()
+			h.BroadcastPresence(client.UserID, client.Username, "offline")
 		}
 	}
 }
 
 func (h *Hub) BroadcastOnlineUsers() {
 	h.mu.RLock()
-	onlineUsers := make([]uuid.UUID, 0, len(h.clients))
-	for userID := range h.clients {
-		onlineUsers = append(onlineUsers, userID)
+	onlineInfo := make([]PresenceInfo, 0, len(h.clients))
+	for _, client := range h.clients {
+		onlineInfo = append(onlineInfo, PresenceInfo{
+			UserID:   client.UserID,
+			Username: client.Username,
+			Status:   client.Status,
+		})
 	}
 	h.mu.RUnlock()
 
 	msg := WSMessage{
 		Type: TypeOnlineUsers,
-		Data: onlineUsers,
+		Data: onlineInfo,
 	}
 	data, _ := json.Marshal(msg)
 
@@ -61,6 +89,70 @@ func (h *Hub) BroadcastOnlineUsers() {
 		default:
 		}
 	}
+}
+
+func (h *Hub) BroadcastPresence(userID uuid.UUID, username, status string) {
+	msg := WSMessage{
+		Type:     TypePresence,
+		UserID:   userID,
+		Username: username,
+		Status:   status,
+	}
+	data, _ := json.Marshal(msg)
+
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for _, client := range h.clients {
+		if client.UserID != userID {
+			select {
+			case client.Send <- data:
+			default:
+			}
+		}
+	}
+}
+
+func (h *Hub) SetUserStatus(client *Client, status string) {
+	h.mu.Lock()
+	client.Status = status
+	h.mu.Unlock()
+
+	if err := h.presenceRepo.Upsert(context.Background(), &models.Presence{
+		UserID:     client.UserID,
+		Status:     status,
+		LastSeenAt: time.Now(),
+	}); err != nil {
+		// Log but don't block
+	}
+
+	h.BroadcastPresence(client.UserID, client.Username, status)
+	h.BroadcastOnlineUsers()
+}
+
+func (h *Hub) GetOnlineUserStatuses() []PresenceInfo {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	result := make([]PresenceInfo, 0, len(h.clients))
+	for _, client := range h.clients {
+		result = append(result, PresenceInfo{
+			UserID:   client.UserID,
+			Username: client.Username,
+			Status:   client.Status,
+		})
+	}
+	return result
+}
+
+func (h *Hub) BroadcastTyping(conversationID uuid.UUID, senderID uuid.UUID, senderUsername string, isTyping bool) {
+	msg := WSMessage{
+		Type:           TypeTyping,
+		ConversationID: conversationID,
+		SenderID:       senderID,
+		SenderUsername: senderUsername,
+		IsTyping:       isTyping,
+	}
+	data, _ := json.Marshal(msg)
+	h.BroadcastToRoom(conversationID, data, senderID)
 }
 
 func (h *Hub) RegisterClient(client *Client) {

@@ -67,6 +67,13 @@ type NotificationRepository interface {
 	Delete(ctx context.Context, id, userID uuid.UUID) error
 }
 
+// PresenceRepository defines presence data operations
+type PresenceRepository interface {
+	Upsert(ctx context.Context, presence *models.Presence) error
+	GetByUserID(ctx context.Context, userID uuid.UUID) (*models.Presence, error)
+	GetOnline(ctx context.Context) ([]models.Presence, error)
+}
+
 // AttachmentRepository defines attachment data operations
 type AttachmentRepository interface {
 	Create(ctx context.Context, attachment *models.Attachment) error
