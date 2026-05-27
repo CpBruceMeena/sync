@@ -250,9 +250,10 @@ export default function ChatPage() {
                   ?.username?.charAt(0)
                   .toUpperCase() || "?"}
           </div>
-          {onlineUsers.includes(
-            selectedConv.members?.find((m) => m.user_id !== user?.id)?.user_id ||
-              ""
+          {onlineUsers.some(
+            (u) =>
+              u.user_id ===
+              selectedConv.members?.find((m) => m.user_id !== user?.id)?.user_id
           ) && (
             <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[var(--online)] border-2 border-[var(--surface)]" />
           )}

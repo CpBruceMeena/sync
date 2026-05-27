@@ -89,6 +89,13 @@ export interface Notification {
   created_at: string;
 }
 
+// Presence info from WebSocket
+export interface PresenceInfo {
+  user_id: string;
+  username: string;
+  status: string;
+}
+
 // Discovery types
 export interface UserResult {
   id: string;
