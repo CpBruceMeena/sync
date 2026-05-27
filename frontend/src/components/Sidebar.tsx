@@ -9,6 +9,7 @@ import { useSelectedConv } from "@/contexts/SelectedConvContext";
 import { CreateGroupDialog } from "./CreateGroupDialog";
 import { NotificationBadge } from "./NotificationBadge";
 import { ProfileDialog } from "./ProfileDialog";
+import { UserProfileDialog } from "./UserProfileDialog";
 import type { Conversation } from "@/types";
 import { DiscoveryDialog } from "./DiscoveryDialog";
 
@@ -21,6 +22,8 @@ export function Sidebar() {
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showDiscovery, setShowDiscovery] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
+  const [showUserProfile, setShowUserProfile] = useState(false);
+  const [viewUser, setViewUser] = useState<import("@/types").User | null>(null);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [convTab, setConvTab] = useState<"all" | "private" | "group">("all");
 
@@ -162,7 +165,18 @@ export function Sidebar() {
                     }`}
                   >
                     <div className="relative flex-shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center text-white font-semibold text-sm">
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (otherMember) {
+                            api.getUser(otherMember.user_id).then((u) => {
+                              setViewUser(u);
+                              setShowUserProfile(true);
+                            }).catch(() => {});
+                          }
+                        }}
+                        className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center text-white font-semibold text-sm cursor-pointer hover:opacity-80 transition-opacity"
+                      >
                         {displayName.charAt(0).toUpperCase()}
                       </div>
                       {conv.type === "private" && (
@@ -204,8 +218,7 @@ export function Sidebar() {
 
         {/* User footer */}
         <div className="p-3 border-t border-[var(--border)]">
-          <div className="flex items-center gap-3 px-2">
-            <button onClick={() => setShowProfile(true)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+          <div className="flex items-center gap-3 px-2">              <button onClick={() => setShowProfile(true)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
               <div className="relative flex-shrink-0">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--primary)] flex items-center justify-center text-white font-semibold text-xs overflow-hidden">
                   {user?.avatar_url ? (
@@ -263,6 +276,13 @@ export function Sidebar() {
       {showProfile && (
         <ProfileDialog
           onClose={() => setShowProfile(false)}
+        />
+      )}
+
+      {showUserProfile && viewUser && (
+        <UserProfileDialog
+          user={viewUser}
+          onClose={() => { setShowUserProfile(false); setViewUser(null); }}
         />
       )}
     </>

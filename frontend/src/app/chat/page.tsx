@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,7 +8,8 @@ import { useWebSocket } from "@/contexts/WebSocketContext";
 import { useSelectedConv } from "@/contexts/SelectedConvContext";
 import { MessageInput } from "@/components/MessageInput";
 import { ReactionPicker } from "@/components/ReactionPicker";
-import type { Message, MessageReaction, WSMessage } from "@/types";
+import { UserProfileDialog } from "@/components/UserProfileDialog";
+import type { Message, MessageReaction, WSMessage, User as UserType } from "@/types";
 
 export default function ChatPage() {
   const { user } = useAuth();
@@ -16,6 +17,16 @@ export default function ChatPage() {
   const { selectedConv } = useSelectedConv();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [showOtherProfile, setShowOtherProfile] = useState(false);
+  const [otherUserProfile, setOtherUserProfile] = useState<UserType | null>(null);
+  const messagesRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    if (messagesRef.current) {
+      messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
+    }
+  }, [messages]);
 
   // Load messages when conversation is selected
   useEffect(() => {
@@ -29,7 +40,7 @@ export default function ChatPage() {
       .finally(() => setLoadingMessages(false));
   }, [selectedConv]);
 
-  // Subscribe to new messages via WebSocket
+  // Subscribe to new messages via WebSocket (other users' messages)
   useEffect(() => {
     if (!selectedConv) return;
 
@@ -37,7 +48,7 @@ export default function ChatPage() {
       if (data.conversation_id === selectedConv.id && data.content && data.message_id) {
         setMessages((prev) => {
           const msgId = data.message_id || "";
-          // Deduplicate: skip if message already exists (avoids double-add from broadcast-to-all)
+          // Deduplicate: skip if message already exists
           if (prev.some((m) => m.id === msgId)) return prev;
           const newMsg: Message = {
             id: msgId,
@@ -232,7 +243,20 @@ export default function ChatPage() {
       {/* Chat header */}
       <div className="glass px-6 py-3 flex items-center gap-3 border-b border-[var(--border)]">
         <div className="relative">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center text-white font-semibold text-sm">
+          <div
+            onClick={() => {
+              if (selectedConv.type === "private") {
+                const otherMember = selectedConv.members?.find((m) => m.user_id !== user?.id);
+                if (otherMember) {
+                  api.getUser(otherMember.user_id).then((u) => {
+                    setOtherUserProfile(u);
+                    setShowOtherProfile(true);
+                  }).catch(() => {});
+                }
+              }
+            }}
+            className={`w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center text-white font-semibold text-sm ${selectedConv.type === "private" ? "cursor-pointer hover:opacity-80" : ""} transition-opacity`}
+          >
             {selectedConv.name
               ? selectedConv.name.charAt(0).toUpperCase()
               : selectedConv.members?.find((m) => m.user_id !== user?.id)
@@ -263,19 +287,19 @@ export default function ChatPage() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-1 smooth-scroll">
+      <div ref={messagesRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-0.5 smooth-scroll">
         {loadingMessages ? (
           <div className="flex items-center justify-center h-full">
             <div className="w-8 h-8 rounded-full border-2 border-[var(--primary)] border-t-transparent animate-spin" />
           </div>
         ) : (
           <AnimatePresence initial={false}>
-            {messages.map((msg, i) => (
+            {messages.map((msg) => (
               <motion.div
                 key={msg.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.15, delay: i * 0.01 }}
+                transition={{ duration: 0.15 }}
               >
                 <MessageBubble
                   message={msg}
@@ -292,6 +316,13 @@ export default function ChatPage() {
 
       {/* Input */}
       <MessageInput onSend={handleSendMessage} onSendFile={handleSendFile} />
+
+      {showOtherProfile && otherUserProfile && (
+        <UserProfileDialog
+          user={otherUserProfile}
+          onClose={() => { setShowOtherProfile(false); setOtherUserProfile(null); }}
+        />
+      )}
     </div>
   );
 }
@@ -336,7 +367,7 @@ function MessageBubble({
 
   return (
     <div
-      className={`flex ${isOwn ? "justify-start" : "justify-end"} mb-2 message-enter`}
+      className={`flex ${isOwn ? "justify-start" : "justify-end"} message-enter w-full`}
     >
       <div className="max-w-[70%] flex flex-col gap-1">
         <div
@@ -425,32 +456,29 @@ function MessageBubble({
         </div>
 
         {/* Reactions */}
-        {(reactionSummary && Object.keys(reactionSummary).length > 0) || (
-          <div className="flex items-center gap-1 pl-1">
-            <ReactionPicker messageId={message.id} onReact={onReact} />
-          </div>
-        )}
-        {reactionSummary && Object.keys(reactionSummary).length > 0 && (
-          <div className="flex items-center gap-1 pl-1">
-            {Object.entries(reactionSummary).map(([emoji, { count, hasReacted }]) => (
-              <button
-                key={emoji}
-                onClick={() => onReact(message.id, emoji)}
-                className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs transition-colors ${
-                  hasReacted
-                    ? "bg-[var(--primary)]/10 border border-[var(--primary)]/30"
-                    : "bg-[var(--surface-3)] border border-[var(--border)] hover:bg-[var(--surface-2)]"
-                }`}
-              >
-                <span>{emoji}</span>
-                {count > 1 && (
-                  <span className="text-[10px] text-[var(--text-muted)]">{count}</span>
-                )}
-              </button>
-            ))}
-            <ReactionPicker messageId={message.id} onReact={onReact} />
-          </div>
-        )}
+        <div className="flex items-center gap-1 pl-1 mt-1">
+          {reactionSummary && Object.keys(reactionSummary).length > 0 && (
+            <>
+              {Object.entries(reactionSummary).map(([emoji, { count, hasReacted }]) => (
+                <button
+                  key={emoji}
+                  onClick={() => onReact(message.id, emoji)}
+                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs transition-colors ${
+                    hasReacted
+                      ? "bg-[var(--primary)]/10 border border-[var(--primary)]/30"
+                      : "bg-[var(--surface-3)] border border-[var(--border)] hover:bg-[var(--surface-2)]"
+                  }`}
+                >
+                  <span>{emoji}</span>
+                  {count > 1 && (
+                    <span className="text-[10px] text-[var(--text-muted)]">{count}</span>
+                  )}
+                </button>
+              ))}
+            </>
+          )}
+          <ReactionPicker messageId={message.id} onReact={onReact} />
+        </div>
       </div>
     </div>
   );

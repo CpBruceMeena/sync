@@ -133,7 +133,7 @@ func (s *Service) SendMessage(ctx context.Context, senderID uuid.UUID, convID uu
 		}
 		data, err := json.Marshal(wsMsg)
 		if err == nil {
-			s.hub.BroadcastToRoom(convID, data, uuid.Nil) // uuid.Nil = send to ALL including sender
+			s.hub.BroadcastToRoom(convID, data, senderID) // Skip sender (they get the message via API response)
 		}
 	}
 

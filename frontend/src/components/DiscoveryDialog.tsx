@@ -5,7 +5,8 @@ import { motion } from "framer-motion";
 import { api } from "@/lib/api";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSelectedConv } from "@/contexts/SelectedConvContext";
-import type { UserResult, GroupDetail } from "@/types";
+import { UserProfileDialog } from "./UserProfileDialog";
+import type { UserResult, GroupDetail, User as UserType } from "@/types";
 
 interface DiscoveryDialogProps {
   onClose: () => void;
@@ -24,6 +25,8 @@ export function DiscoveryDialog({ onClose }: DiscoveryDialogProps) {
   const [users, setUsers] = useState<UserResult[]>([]);
   const [groups, setGroups] = useState<GroupDetail[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<GroupDetail | null>(null);
+  const [showUserProfile, setShowUserProfile] = useState(false);
+  const [viewUser, setViewUser] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -261,15 +264,41 @@ export function DiscoveryDialog({ onClose }: DiscoveryDialogProps) {
                     <button
                       key={u.id}
                       onClick={() => handleUserClick(u)}
-                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--surface-2)] transition-colors text-left"
+                      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--surface-2)] transition-colors text-left group"
                     >
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center text-white font-semibold text-xs">
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          api.getUser(u.id).then((userData) => {
+                            setViewUser(userData);
+                            setShowUserProfile(true);
+                          }).catch(() => {});
+                        }}
+                        className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center text-white font-semibold text-xs cursor-pointer hover:opacity-80 transition-opacity flex-shrink-0"
+                      >
                         {u.username.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-[var(--foreground)] truncate">
-                          {u.display_name || u.username}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-[var(--foreground)] truncate">
+                            {u.display_name || u.username}
+                          </p>
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              api.getUser(u.id).then((userData) => {
+                                setViewUser(userData);
+                                setShowUserProfile(true);
+                              }).catch(() => {});
+                            }}
+                            className="text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0 cursor-pointer"
+                            title="View profile"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                          </span>
+                        </div>
                         <p className="text-xs text-[var(--text-muted)] truncate">
                           @{u.username}
                           {u.status !== "offline" && (
@@ -338,6 +367,13 @@ export function DiscoveryDialog({ onClose }: DiscoveryDialogProps) {
           </button>
         </div>
       </motion.div>
+
+      {showUserProfile && viewUser && (
+        <UserProfileDialog
+          user={viewUser}
+          onClose={() => { setShowUserProfile(false); setViewUser(null); }}
+        />
+      )}
     </div>
   );
 }

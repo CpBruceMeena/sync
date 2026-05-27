@@ -110,7 +110,7 @@ export function NotificationBadge() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.96 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 mt-2 w-80 bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-2xl overflow-hidden z-50"
+            className="absolute right-0 mt-2 w-80 max-w-[90vw] bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-2xl overflow-hidden z-50 right-0 sm:right-auto sm:left-auto"
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
               <span className="text-sm font-semibold text-[var(--foreground)]">
