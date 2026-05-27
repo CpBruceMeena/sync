@@ -289,21 +289,6 @@ Connect via `ws://localhost:8080/ws?token={jwt_token}`
 - Frontend: Vitest with jsdom for component testing
 - Full-stack E2E: Playwright for browser-level testing
 
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DB_HOST` | localhost | PostgreSQL host |
-| `DB_PORT` | 5432 | PostgreSQL port |
-| `DB_USER` | postgres | Database user |
-| `DB_PASSWORD` | password | Database password |
-| `DB_NAME` | sync | Database name |
-| `DB_SSLMODE` | disable | SSL mode |
-| `SERVER_PORT` | 8080 | Backend server port |
-| `JWT_SECRET` | super-secret-key-change-in-production | JWT signing key |
-| `JWT_ACCESS_TTL` | 15 | Access token TTL (minutes) |
-| `JWT_REFRESH_TTL` | 7 | Refresh token TTL (days) |
-
 ## License
 
 MIT
