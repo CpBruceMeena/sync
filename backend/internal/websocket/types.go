@@ -66,10 +66,11 @@ type Client struct {
 
 // Hub manages all connected WebSocket clients and room subscriptions
 type Hub struct {
-	clients      map[uuid.UUID]*Client
-	rooms        map[uuid.UUID]map[uuid.UUID]*Client // conversationID -> clients
-	register     chan *Client
-	unregister   chan *Client
-	mu           sync.RWMutex
-	presenceRepo repository.PresenceRepository
+	clients         map[uuid.UUID]*Client
+	rooms           map[uuid.UUID]map[uuid.UUID]*Client // conversationID -> clients
+	register        chan *Client
+	unregister      chan *Client
+	mu              sync.RWMutex
+	presenceRepo    repository.PresenceRepository
+	messageReadRepo repository.MessageReadRepository
 }

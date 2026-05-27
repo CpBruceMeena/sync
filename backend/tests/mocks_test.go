@@ -331,6 +331,24 @@ func (m *mockAttachmentRepo) GetByMessageID(ctx context.Context, messageID uuid.
 	return nil, nil
 }
 
+type mockMessageReadRepo struct {
+	upsertFn            func(ctx context.Context, convID, userID uuid.UUID) error
+	getByConversationFn func(ctx context.Context, convID uuid.UUID) ([]models.MessageRead, error)
+}
+
+func (m *mockMessageReadRepo) Upsert(ctx context.Context, convID, userID uuid.UUID) error {
+	if m.upsertFn != nil {
+		return m.upsertFn(ctx, convID, userID)
+	}
+	return nil
+}
+func (m *mockMessageReadRepo) GetByConversation(ctx context.Context, convID uuid.UUID) ([]models.MessageRead, error) {
+	if m.getByConversationFn != nil {
+		return m.getByConversationFn(ctx, convID)
+	}
+	return nil, nil
+}
+
 type mockPresenceRepo struct {
 	upsertFn      func(ctx context.Context, presence *models.Presence) error
 	getByUserIDFn func(ctx context.Context, userID uuid.UUID) (*models.Presence, error)
@@ -368,6 +386,7 @@ func newMockRepos() *repository.Repositories {
 		Notifications: &mockNotifRepo{},
 		Attachments:   &mockAttachmentRepo{},
 		Presence:      &mockPresenceRepo{},
+		MessageRead:   &mockMessageReadRepo{},
 	}
 }
 

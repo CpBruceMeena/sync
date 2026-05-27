@@ -1,6 +1,7 @@
 package websocket
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -100,6 +101,12 @@ func (c *Client) handleMessage(msg WSMessage) {
 	case TypeReadReceipt:
 		msg.SenderID = c.UserID
 		msg.SenderUsername = c.Username
+		// Persist the read receipt
+		if c.Hub.messageReadRepo != nil {
+			if err := c.Hub.messageReadRepo.Upsert(context.Background(), msg.ConversationID, c.UserID); err != nil {
+				log.Printf("Error persisting read receipt: %v", err)
+			}
+		}
 		data, _ := json.Marshal(msg)
 		c.Hub.BroadcastToRoom(msg.ConversationID, data, c.UserID)
 

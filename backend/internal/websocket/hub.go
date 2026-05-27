@@ -10,13 +10,14 @@ import (
 	"github.com/google/uuid"
 )
 
-func NewHub(presenceRepo repository.PresenceRepository) *Hub {
+func NewHub(presenceRepo repository.PresenceRepository, messageReadRepo repository.MessageReadRepository) *Hub {
 	return &Hub{
-		clients:      make(map[uuid.UUID]*Client),
-		rooms:        make(map[uuid.UUID]map[uuid.UUID]*Client),
-		register:     make(chan *Client, 256),
-		unregister:   make(chan *Client, 256),
-		presenceRepo: presenceRepo,
+		clients:         make(map[uuid.UUID]*Client),
+		rooms:           make(map[uuid.UUID]map[uuid.UUID]*Client),
+		register:        make(chan *Client, 256),
+		unregister:      make(chan *Client, 256),
+		presenceRepo:    presenceRepo,
+		messageReadRepo: messageReadRepo,
 	}
 }
 

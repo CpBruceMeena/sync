@@ -56,6 +56,7 @@ export interface Message {
   created_at: string;
   reactions?: MessageReaction[];
   attachments?: Attachment[];
+  read_by?: ReadReceiptInfo[];
 }
 
 export interface Attachment {
@@ -64,6 +65,12 @@ export interface Attachment {
   file_type: string;
   file_name: string;
   file_size: number;
+}
+
+export interface ReadReceiptInfo {
+  user_id: string;
+  username: string;
+  read_at: string;
 }
 
 export interface MessageReaction {

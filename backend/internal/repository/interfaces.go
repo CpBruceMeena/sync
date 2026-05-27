@@ -74,6 +74,12 @@ type PresenceRepository interface {
 	GetOnline(ctx context.Context) ([]models.Presence, error)
 }
 
+// MessageReadRepository defines read receipt data operations
+type MessageReadRepository interface {
+	Upsert(ctx context.Context, convID, userID uuid.UUID) error
+	GetByConversation(ctx context.Context, convID uuid.UUID) ([]models.MessageRead, error)
+}
+
 // AttachmentRepository defines attachment data operations
 type AttachmentRepository interface {
 	Create(ctx context.Context, attachment *models.Attachment) error

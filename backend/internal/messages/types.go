@@ -20,6 +20,7 @@ type MessageResponse struct {
 	CreatedAt      string               `json:"created_at"`
 	Reactions      []ReactionResponse   `json:"reactions,omitempty"`
 	Attachments    []AttachmentResponse `json:"attachments,omitempty"`
+	ReadBy         []ReadReceiptInfo    `json:"read_by,omitempty"`
 }
 
 // ReactionResponse represents a reaction in API responses
@@ -27,6 +28,13 @@ type ReactionResponse struct {
 	UserID   string `json:"user_id"`
 	Username string `json:"username"`
 	Emoji    string `json:"emoji"`
+}
+
+// ReadReceiptInfo represents who has read a message
+type ReadReceiptInfo struct {
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
+	ReadAt   string `json:"read_at"`
 }
 
 // AttachmentResponse represents an attachment in API responses

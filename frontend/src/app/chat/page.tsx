@@ -9,11 +9,11 @@ import { useSelectedConv } from "@/contexts/SelectedConvContext";
 import { MessageInput } from "@/components/MessageInput";
 import { ReactionPicker } from "@/components/ReactionPicker";
 import { UserProfileDialog } from "@/components/UserProfileDialog";
-import type { Message, MessageReaction, WSMessage, User as UserType } from "@/types";
+import type { Message, MessageReaction, WSMessage, User as UserType, ReadReceiptInfo } from "@/types";
 
 export default function ChatPage() {
   const { user } = useAuth();
-  const { subscribe, onlineUsers } = useWebSocket();
+  const { subscribe, sendMessage, onlineUsers } = useWebSocket();
   const { selectedConv } = useSelectedConv();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -40,6 +40,18 @@ export default function ChatPage() {
       .finally(() => setLoadingMessages(false));
   }, [selectedConv]);
 
+  // Send read receipt when conversation is opened / messages load
+  useEffect(() => {
+    if (!selectedConv || messages.length === 0) return;
+
+    const latestMsg = messages[messages.length - 1];
+    sendMessage({
+      type: "read_receipt",
+      conversation_id: selectedConv.id,
+      message_id: latestMsg.id,
+    });
+  }, [selectedConv, messages.length > 0 ? messages[messages.length - 1]?.id : null]);
+
   // Subscribe to new messages via WebSocket (other users' messages)
   useEffect(() => {
     if (!selectedConv) return;
@@ -62,6 +74,41 @@ export default function ChatPage() {
           return [...prev, newMsg];
         });
       }
+    });
+
+    return unsub;
+  }, [selectedConv, subscribe]);
+
+  // Subscribe to read receipt events via WebSocket
+  useEffect(() => {
+    if (!selectedConv) return;
+
+    const unsub = subscribe("read_receipt", (data: WSMessage) => {
+      if (data.conversation_id !== selectedConv.id) return;
+
+      // Update messages: add the reader to read_by for messages they've read
+      setMessages((prev) =>
+        prev.map((msg) => {
+          // If this reader hasn't already been recorded for this message,
+          // and they're not the sender (we track others reading our messages)
+          if (msg.sender_id === data.sender_id) return msg;
+          const alreadyRead = msg.read_by?.some(
+            (r) => r.user_id === data.sender_id
+          );
+          if (alreadyRead) return msg;
+          return {
+            ...msg,
+            read_by: [
+              ...(msg.read_by || []),
+              {
+                user_id: data.sender_id || "",
+                username: data.sender_username || "",
+                read_at: new Date().toISOString(),
+              } as ReadReceiptInfo,
+            ],
+          };
+        })
+      );
     });
 
     return unsub;
@@ -500,24 +547,44 @@ function MessageBubble({
               {message.content}
             </p>
           )}
-          <p
-            className={`text-[10px] mt-1 ${
-              isOwn ? "text-[var(--text-muted)]" : "text-white/60"
-            }`}
-            title={new Date(message.created_at).toLocaleString([], {
-              weekday: "short",
-              year: "numeric",
-              month: "short",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          >
-            {new Date(message.created_at).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </p>
+          <div className="flex items-center gap-1.5 mt-1">
+            <p
+              className={`text-[10px] ${
+                isOwn ? "text-[var(--text-muted)]" : "text-white/60"
+              }`}
+              title={new Date(message.created_at).toLocaleString([], {
+                weekday: "short",
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            >
+              {new Date(message.created_at).toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
+            {isOwn && (
+              <span
+                className="text-[10px] flex items-center gap-0.5"
+                title={
+                  message.read_by && message.read_by.length > 0
+                    ? `Seen by ${message.read_by.map(r => r.username).join(", ")}`
+                    : "Delivered"
+                }
+              >
+                {message.read_by && message.read_by.length > 0 ? (
+                  <>
+                    <span className="text-[var(--primary)]">✓✓</span>
+                  </>
+                ) : (
+                  <span className="text-[var(--text-muted)]">✓</span>
+                )}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Reactions */}

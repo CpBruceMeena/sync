@@ -31,6 +31,9 @@ func (s *Service) ListMessages(ctx context.Context, convID uuid.UUID, cursor uui
 		return nil, err
 	}
 
+	// Fetch read receipts for the conversation
+	reads, _ := s.repos.MessageRead.GetByConversation(ctx, convID)
+
 	response := make([]MessageResponse, 0, len(messages))
 	for _, msg := range messages {
 		sender, err := s.repos.Users.GetByID(ctx, msg.SenderID)
@@ -68,6 +71,22 @@ func (s *Service) ListMessages(ctx context.Context, convID uuid.UUID, cursor uui
 			})
 		}
 
+		// Compute who has read this message
+		readBy := make([]ReadReceiptInfo, 0)
+		for _, read := range reads {
+			if !read.LastReadAt.Before(msg.CreatedAt) {
+				username := ""
+				if user, err := s.repos.Users.GetByID(ctx, read.UserID); err == nil && user != nil {
+					username = user.Username
+				}
+				readBy = append(readBy, ReadReceiptInfo{
+					UserID:   read.UserID.String(),
+					Username: username,
+					ReadAt:   read.LastReadAt.Format("2006-01-02T15:04:05Z07:00"),
+				})
+			}
+		}
+
 		response = append(response, MessageResponse{
 			ID:             msg.ID,
 			ConversationID: msg.ConversationID,
@@ -78,6 +97,7 @@ func (s *Service) ListMessages(ctx context.Context, convID uuid.UUID, cursor uui
 			CreatedAt:      msg.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			Reactions:      reactionResponses,
 			Attachments:    attachmentResponses,
+			ReadBy:         readBy,
 		})
 	}
 
@@ -130,6 +150,7 @@ func (s *Service) SendMessage(ctx context.Context, senderID uuid.UUID, convID uu
 			SenderUsername: senderUsername,
 			Content:        content,
 			MessageID:      msg.ID,
+			Data:           msg.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		}
 		data, err := json.Marshal(wsMsg)
 		if err == nil {

@@ -17,6 +17,12 @@ func RunMigrations(db *gorm.DB) error {
 			last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);`,
 		`ALTER TABLE users ADD COLUMN IF NOT EXISTS bio VARCHAR(500) NOT NULL DEFAULT '';`,
+		`CREATE TABLE IF NOT EXISTS message_reads (
+			conversation_id UUID NOT NULL,
+			user_id UUID NOT NULL,
+			last_read_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+			UNIQUE(conversation_id, user_id)
+		);`,
 	}
 
 	for _, m := range migrations {

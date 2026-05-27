@@ -44,7 +44,7 @@ func main() {
 	authService := auth.NewService(cfg.JWTSecret, cfg.AccessTTL, cfg.RefreshTTL)
 
 	// Create WebSocket hub first (services depend on it)
-	wsHub := websocket.NewHub(repos.Presence)
+	wsHub := websocket.NewHub(repos.Presence, repos.MessageRead)
 	go wsHub.Run()
 	wsHandler := websocket.NewWsHandler(wsHub, authService, repos)
 
