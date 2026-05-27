@@ -294,22 +294,39 @@ export default function ChatPage() {
           </div>
         ) : (
           <AnimatePresence initial={false}>
-            {messages.map((msg) => (
-              <motion.div
-                key={msg.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.15 }}
-              >
-                <MessageBubble
-                  message={msg}
-                  isOwn={msg.sender_id === user?.id}
-                  isGroup={selectedConv.type === "group"}
-                  userId={user?.id || ""}
-                  onReact={handleReact}
-                />
-              </motion.div>
-            ))}
+            {messages.map((msg, i) => {
+              const showDateSeparator = (() => {
+                if (i === 0) return true;
+                const prevDate = new Date(messages[i - 1].created_at);
+                const currDate = new Date(msg.created_at);
+                return (
+                  prevDate.getFullYear() !== currDate.getFullYear() ||
+                  prevDate.getMonth() !== currDate.getMonth() ||
+                  prevDate.getDate() !== currDate.getDate()
+                );
+              })();
+
+              return (
+                <motion.div key={msg.id}>
+                  {showDateSeparator && (
+                    <DateSeparator createdAt={msg.created_at} />
+                  )}
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.15 }}
+                  >
+                    <MessageBubble
+                      message={msg}
+                      isOwn={msg.sender_id === user?.id}
+                      isGroup={selectedConv.type === "group"}
+                      userId={user?.id || ""}
+                      onReact={handleReact}
+                    />
+                  </motion.div>
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         )}
       </div>
@@ -328,6 +345,46 @@ export default function ChatPage() {
 }
 
 // Internal MessageBubble component
+// Date separator inserted between messages on different days
+function DateSeparator({ createdAt }: { createdAt: string }) {
+  const date = new Date(createdAt);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  let label: string;
+  if (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate()
+  ) {
+    label = "Today";
+  } else if (
+    date.getFullYear() === yesterday.getFullYear() &&
+    date.getMonth() === yesterday.getMonth() &&
+    date.getDate() === yesterday.getDate()
+  ) {
+    label = "Yesterday";
+  } else {
+    label = date.toLocaleDateString([], {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  }
+
+  return (
+    <div className="flex items-center gap-3 py-3">
+      <div className="flex-1 h-px bg-[var(--border)]" />
+      <span className="text-[11px] font-medium text-[var(--text-muted)] uppercase tracking-wider flex-shrink-0">
+        {label}
+      </span>
+      <div className="flex-1 h-px bg-[var(--border)]" />
+    </div>
+  );
+}
+
 function MessageBubble({
   message,
   isOwn,
@@ -447,6 +504,14 @@ function MessageBubble({
             className={`text-[10px] mt-1 ${
               isOwn ? "text-[var(--text-muted)]" : "text-white/60"
             }`}
+            title={new Date(message.created_at).toLocaleString([], {
+              weekday: "short",
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
           >
             {new Date(message.created_at).toLocaleTimeString([], {
               hour: "2-digit",
