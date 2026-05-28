@@ -129,12 +129,11 @@ function InputField({
         {/* Animated gradient background on focus */}
         <motion.div
           className="absolute inset-0 rounded-xl pointer-events-none"
-          initial={false}
-          animate={{
-            background: isFocused
-              ? "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(167,139,250,0.04))"
-              : "transparent",
+          style={{
+            background: "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(167,139,250,0.04))",
           }}
+          initial={false}
+          animate={{ opacity: isFocused ? 1 : 0 }}
           transition={{ duration: 0.3 }}
         />
 
