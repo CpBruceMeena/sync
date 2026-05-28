@@ -14,6 +14,7 @@ type User struct {
 	DisplayName  string    `gorm:"column:display_name;size:100" json:"display_name"`
 	AvatarUrl    string    `gorm:"column:avatar_url;size:500" json:"avatar_url"`
 	Status       string    `gorm:"default:'offline';size:20" json:"status"`
+	Bio          string    `gorm:"size:500" json:"bio"`
 	CreatedAt    time.Time `json:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 }

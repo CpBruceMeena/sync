@@ -23,6 +23,7 @@ type ConversationResponse struct {
 	Members            []MemberResponse `json:"members,omitempty"`
 	LastMessageContent *string          `json:"last_message_content,omitempty"`
 	LastMessageAt      *time.Time       `json:"last_message_at,omitempty"`
+	UnreadCount        int64            `json:"unread_count"`
 }
 
 // MemberResponse represents a conversation member in API responses

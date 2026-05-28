@@ -10,6 +10,7 @@ describe("Type definitions", () => {
       display_name: "Test User",
       avatar_url: "",
       status: "online",
+      bio: "",
     };
 
     expect(user.id).toBe("1");
@@ -36,6 +37,7 @@ describe("Type definitions", () => {
         display_name: "Test",
         avatar_url: "",
         status: "online",
+        bio: "",
       },
       token: {
         access_token: "abc",

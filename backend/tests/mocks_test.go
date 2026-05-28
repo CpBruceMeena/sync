@@ -183,6 +183,7 @@ type mockMsgRepo struct {
 	addReactionFn    func(ctx context.Context, reaction *models.Reaction) error
 	removeReactionFn func(ctx context.Context, messageID, userID uuid.UUID, emoji string) error
 	getReactionsFn   func(ctx context.Context, messageID uuid.UUID) ([]models.Reaction, error)
+	searchByConvFn   func(ctx context.Context, convID uuid.UUID, query string, limit, offset int) ([]models.Message, error)
 }
 
 func (m *mockMsgRepo) Create(ctx context.Context, msg *models.Message) error {
@@ -224,6 +225,12 @@ func (m *mockMsgRepo) RemoveReaction(ctx context.Context, messageID, userID uuid
 func (m *mockMsgRepo) GetReactionsByMessage(ctx context.Context, messageID uuid.UUID) ([]models.Reaction, error) {
 	if m.getReactionsFn != nil {
 		return m.getReactionsFn(ctx, messageID)
+	}
+	return nil, nil
+}
+func (m *mockMsgRepo) SearchByConversation(ctx context.Context, convID uuid.UUID, query string, limit, offset int) ([]models.Message, error) {
+	if m.searchByConvFn != nil {
+		return m.searchByConvFn(ctx, convID, query, limit, offset)
 	}
 	return nil, nil
 }
@@ -331,6 +338,31 @@ func (m *mockAttachmentRepo) GetByMessageID(ctx context.Context, messageID uuid.
 	return nil, nil
 }
 
+type mockMessageReadRepo struct {
+	upsertFn            func(ctx context.Context, convID, userID uuid.UUID) error
+	getByConversationFn func(ctx context.Context, convID uuid.UUID) ([]models.MessageRead, error)
+	getUnreadCountsFn   func(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]int64, error)
+}
+
+func (m *mockMessageReadRepo) Upsert(ctx context.Context, convID, userID uuid.UUID) error {
+	if m.upsertFn != nil {
+		return m.upsertFn(ctx, convID, userID)
+	}
+	return nil
+}
+func (m *mockMessageReadRepo) GetByConversation(ctx context.Context, convID uuid.UUID) ([]models.MessageRead, error) {
+	if m.getByConversationFn != nil {
+		return m.getByConversationFn(ctx, convID)
+	}
+	return nil, nil
+}
+func (m *mockMessageReadRepo) GetUnreadCounts(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]int64, error) {
+	if m.getUnreadCountsFn != nil {
+		return m.getUnreadCountsFn(ctx, userID)
+	}
+	return nil, nil
+}
+
 type mockPresenceRepo struct {
 	upsertFn      func(ctx context.Context, presence *models.Presence) error
 	getByUserIDFn func(ctx context.Context, userID uuid.UUID) (*models.Presence, error)
@@ -368,6 +400,7 @@ func newMockRepos() *repository.Repositories {
 		Notifications: &mockNotifRepo{},
 		Attachments:   &mockAttachmentRepo{},
 		Presence:      &mockPresenceRepo{},
+		MessageRead:   &mockMessageReadRepo{},
 	}
 }
 

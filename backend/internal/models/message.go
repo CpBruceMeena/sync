@@ -56,3 +56,13 @@ type TypingEvent struct {
 func (TypingEvent) TableName() string {
 	return "typing_events"
 }
+
+type MessageRead struct {
+	ConversationID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_conv_user_read" json:"conversation_id"`
+	UserID         uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_conv_user_read" json:"user_id"`
+	LastReadAt     time.Time `gorm:"not null" json:"last_read_at"`
+}
+
+func (MessageRead) TableName() string {
+	return "message_reads"
+}

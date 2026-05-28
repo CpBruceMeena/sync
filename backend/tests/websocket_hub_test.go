@@ -16,8 +16,12 @@ func newTestPresenceRepo() repository.PresenceRepository {
 	return &mockPresenceRepo{}
 }
 
+func newTestMessageReadRepo() repository.MessageReadRepository {
+	return &mockMessageReadRepo{}
+}
+
 func TestHub_NewHub(t *testing.T) {
-	hub := websocket.NewHub(newTestPresenceRepo())
+	hub := websocket.NewHub(newTestPresenceRepo(), newTestMessageReadRepo())
 	if hub == nil {
 		t.Fatal("NewHub returned nil")
 	}
@@ -26,7 +30,7 @@ func TestHub_NewHub(t *testing.T) {
 }
 
 func TestHub_RegisterAndUnregisterClient(t *testing.T) {
-	hub := websocket.NewHub(newTestPresenceRepo())
+	hub := websocket.NewHub(newTestPresenceRepo(), newTestMessageReadRepo())
 	go hub.Run()
 
 	client := &websocket.Client{
@@ -55,7 +59,7 @@ func TestHub_RegisterAndUnregisterClient(t *testing.T) {
 }
 
 func TestHub_JoinRoom(t *testing.T) {
-	hub := websocket.NewHub(newTestPresenceRepo())
+	hub := websocket.NewHub(newTestPresenceRepo(), newTestMessageReadRepo())
 	go hub.Run()
 
 	client1 := &websocket.Client{
@@ -72,7 +76,7 @@ func TestHub_JoinRoom(t *testing.T) {
 }
 
 func TestHub_LeaveRoom(t *testing.T) {
-	hub := websocket.NewHub(newTestPresenceRepo())
+	hub := websocket.NewHub(newTestPresenceRepo(), newTestMessageReadRepo())
 	go hub.Run()
 
 	client := &websocket.Client{
@@ -90,7 +94,7 @@ func TestHub_LeaveRoom(t *testing.T) {
 }
 
 func TestHub_IsUserOnline(t *testing.T) {
-	hub := websocket.NewHub(newTestPresenceRepo())
+	hub := websocket.NewHub(newTestPresenceRepo(), newTestMessageReadRepo())
 	go hub.Run()
 
 	userID := uuid.New()
@@ -116,7 +120,7 @@ func TestHub_IsUserOnline(t *testing.T) {
 }
 
 func TestHub_GetClient(t *testing.T) {
-	hub := websocket.NewHub(newTestPresenceRepo())
+	hub := websocket.NewHub(newTestPresenceRepo(), newTestMessageReadRepo())
 	go hub.Run()
 
 	userID := uuid.New()
@@ -142,8 +146,74 @@ func TestHub_GetClient(t *testing.T) {
 	}
 }
 
+func TestHub_BroadcastToRoomSkipsSender(t *testing.T) {
+	hub := websocket.NewHub(newTestPresenceRepo(), newTestMessageReadRepo())
+	go hub.Run()
+
+	senderID := uuid.New()
+	otherUserID := uuid.New()
+	convID := uuid.New()
+
+	senderChan := make(chan []byte, 256)
+	otherChan := make(chan []byte, 256)
+
+	sender := &websocket.Client{
+		UserID:   senderID,
+		Username: "sender",
+		Send:     senderChan,
+		Hub:      hub,
+	}
+	other := &websocket.Client{
+		UserID:   otherUserID,
+		Username: "other",
+		Send:     otherChan,
+		Hub:      hub,
+	}
+
+	hub.RegisterClient(sender)
+	hub.RegisterClient(other)
+	time.Sleep(20 * time.Millisecond)
+
+	hub.JoinRoom(convID, sender)
+	hub.JoinRoom(convID, other)
+	time.Sleep(10 * time.Millisecond)
+
+	// Drain any system messages (online_users/presence broadcasts from registration)
+	drain := func(c chan []byte) {
+		for {
+			select {
+			case <-c:
+			default:
+				return
+			}
+		}
+	}
+	drain(senderChan)
+	drain(otherChan)
+
+	msg := []byte(`{"type":"new_message","content":"hello"}`)
+	hub.BroadcastToRoom(convID, msg, senderID)
+	time.Sleep(10 * time.Millisecond)
+
+	// Sender should NOT receive the message
+	select {
+	case received := <-senderChan:
+		t.Errorf("Sender received broadcast — should be skipped. Got: %s", string(received))
+	default:
+		// Expected: sender channel is empty
+	}
+
+	// Other user SHOULD receive the message
+	select {
+	case <-otherChan:
+		// Expected: other user received the message
+	default:
+		t.Error("Other user did not receive broadcast — should have")
+	}
+}
+
 func TestHub_DuplicateRegister(t *testing.T) {
-	hub := websocket.NewHub(newTestPresenceRepo())
+	hub := websocket.NewHub(newTestPresenceRepo(), newTestMessageReadRepo())
 	go hub.Run()
 
 	userID := uuid.New()
@@ -176,7 +246,7 @@ func TestHub_DuplicateRegister(t *testing.T) {
 }
 
 func TestHub_MultipleClientsAndRooms(t *testing.T) {
-	hub := websocket.NewHub(newTestPresenceRepo())
+	hub := websocket.NewHub(newTestPresenceRepo(), newTestMessageReadRepo())
 	go hub.Run()
 
 	// Create multiple clients

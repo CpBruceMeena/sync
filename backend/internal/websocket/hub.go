@@ -3,6 +3,7 @@ package websocket
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"time"
 
 	"github.com/CpBruceMeena/sync/internal/models"
@@ -10,13 +11,14 @@ import (
 	"github.com/google/uuid"
 )
 
-func NewHub(presenceRepo repository.PresenceRepository) *Hub {
+func NewHub(presenceRepo repository.PresenceRepository, messageReadRepo repository.MessageReadRepository) *Hub {
 	return &Hub{
-		clients:      make(map[uuid.UUID]*Client),
-		rooms:        make(map[uuid.UUID]map[uuid.UUID]*Client),
-		register:     make(chan *Client, 256),
-		unregister:   make(chan *Client, 256),
-		presenceRepo: presenceRepo,
+		clients:         make(map[uuid.UUID]*Client),
+		rooms:           make(map[uuid.UUID]map[uuid.UUID]*Client),
+		register:        make(chan *Client, 256),
+		unregister:      make(chan *Client, 256),
+		presenceRepo:    presenceRepo,
+		messageReadRepo: messageReadRepo,
 	}
 }
 
@@ -156,7 +158,18 @@ func (h *Hub) BroadcastTyping(conversationID uuid.UUID, senderID uuid.UUID, send
 }
 
 func (h *Hub) RegisterClient(client *Client) {
-	h.register <- client
+	// Add to clients map synchronously so GetClient immediately returns the client.
+	// This avoids a race between registration and message delivery.
+	h.mu.Lock()
+	client.Status = "online"
+	h.clients[client.UserID] = client
+	h.mu.Unlock()
+
+	// Also send to register channel for async presence broadcasts (Run goroutine)
+	select {
+	case h.register <- client:
+	default:
+	}
 }
 
 func (h *Hub) UnregisterClient(client *Client) {
@@ -171,6 +184,17 @@ func (h *Hub) JoinRoom(conversationID uuid.UUID, client *Client) {
 		h.rooms[conversationID] = make(map[uuid.UUID]*Client)
 	}
 	h.rooms[conversationID][client.UserID] = client
+}
+
+// SubscribeUserToConversation subscribes a user's WebSocket client to a conversation room.
+// Returns true if the user was found and subscribed, false otherwise.
+func (h *Hub) SubscribeUserToConversation(convID uuid.UUID, userID uuid.UUID) bool {
+	client := h.GetClient(userID)
+	if client == nil {
+		return false
+	}
+	h.JoinRoom(convID, client)
+	return true
 }
 
 func (h *Hub) LeaveRoom(conversationID uuid.UUID, userID uuid.UUID) {
@@ -188,14 +212,42 @@ func (h *Hub) LeaveRoom(conversationID uuid.UUID, userID uuid.UUID) {
 func (h *Hub) BroadcastToRoom(conversationID uuid.UUID, message []byte, senderID uuid.UUID) {
 	h.mu.RLock()
 	room := h.rooms[conversationID]
+	// Clone the room under the lock to avoid concurrent map iteration panics
+	clients := make([]*Client, 0, len(room))
+	for _, client := range room {
+		clients = append(clients, client)
+	}
 	h.mu.RUnlock()
 
-	for _, client := range room {
+	for _, client := range clients {
 		if client.UserID != senderID {
 			select {
 			case client.Send <- message:
 			default:
 			}
+		}
+	}
+}
+
+func (h *Hub) BroadcastToRoomAll(conversationID uuid.UUID, message []byte) {
+	h.mu.RLock()
+	room := h.rooms[conversationID]
+	// Clone the room under the lock to avoid concurrent map iteration panics
+	clients := make([]*Client, 0, len(room))
+	for _, client := range room {
+		clients = append(clients, client)
+	}
+	h.mu.RUnlock()
+
+	if len(clients) == 0 {
+		log.Printf("[WS] BroadcastToRoomAll: room %s has no subscribers — message was not delivered to anyone", conversationID)
+		return
+	}
+
+	for _, client := range clients {
+		select {
+		case client.Send <- message:
+		default:
 		}
 	}
 }

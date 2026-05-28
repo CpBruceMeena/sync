@@ -9,7 +9,7 @@ import React, {
   useCallback,
   type ReactNode,
 } from "react";
-import { getWSClient, WSClient } from "@/lib/websocket";
+import { WSClient } from "@/lib/websocket";
 import { useAuth } from "./AuthContext";
 import type { WSMessage, PresenceInfo } from "@/types";
 
@@ -33,7 +33,9 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) return;
 
-    const client = getWSClient();
+    // Create a fresh WS client for this user — avoids stale token issues
+    // when switching between users (logout/login)
+    const client = new WSClient();
     clientRef.current = client;
 
     const cleanupConnect = client.on("connect", () => setIsConnected(true));
@@ -51,6 +53,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       cleanupDisconnect();
       cleanupOnline();
       client.disconnect();
+      clientRef.current = null;
     };
   }, [user]);
 

@@ -43,4 +43,5 @@ type UserResponse struct {
 	DisplayName string    `json:"display_name"`
 	AvatarURL   string    `json:"avatar_url"`
 	Status      string    `json:"status"`
+	Bio         string    `json:"bio"`
 }

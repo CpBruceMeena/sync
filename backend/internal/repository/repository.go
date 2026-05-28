@@ -11,6 +11,7 @@ type Repositories struct {
 	Notifications NotificationRepository
 	Presence      PresenceRepository
 	Attachments   AttachmentRepository
+	MessageRead   MessageReadRepository
 }
 
 // NewRepositories creates all repository instances
@@ -23,5 +24,6 @@ func NewRepositories(db *gorm.DB) *Repositories {
 		Notifications: NewNotificationRepository(db),
 		Presence:      NewPresenceRepository(db),
 		Attachments:   NewAttachmentRepository(db),
+		MessageRead:   NewMessageReadRepository(db),
 	}
 }

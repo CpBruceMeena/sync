@@ -39,19 +39,27 @@ type WsHandler struct {
 
 // WSMessage is the WebSocket message format exchanged between clients and server
 type WSMessage struct {
-	Type           string      `json:"type"`
-	ConversationID uuid.UUID   `json:"conversation_id,omitempty"`
-	SenderID       uuid.UUID   `json:"sender_id,omitempty"`
-	SenderUsername string      `json:"sender_username,omitempty"`
-	Content        string      `json:"content,omitempty"`
-	MessageID      uuid.UUID   `json:"message_id,omitempty"`
-	UserID         uuid.UUID   `json:"user_id,omitempty"`
-	Username       string      `json:"username,omitempty"`
-	Status         string      `json:"status,omitempty"`
-	IsTyping       bool        `json:"is_typing,omitempty"`
-	Emoji          string      `json:"emoji,omitempty"`
-	Error          string      `json:"error,omitempty"`
-	Data           interface{} `json:"data,omitempty"`
+	Type           string           `json:"type"`
+	ConversationID uuid.UUID        `json:"conversation_id,omitempty"`
+	SenderID       uuid.UUID        `json:"sender_id,omitempty"`
+	SenderUsername string           `json:"sender_username,omitempty"`
+	Content        string           `json:"content,omitempty"`
+	MessageID      uuid.UUID        `json:"message_id,omitempty"`
+	UserID         uuid.UUID        `json:"user_id,omitempty"`
+	Username       string           `json:"username,omitempty"`
+	Status         string           `json:"status,omitempty"`
+	IsTyping       bool             `json:"is_typing,omitempty"`
+	Emoji          string           `json:"emoji,omitempty"`
+	Error          string           `json:"error,omitempty"`
+	Data           interface{}      `json:"data,omitempty"`
+	Conversation   *ConversationInfo `json:"conversation,omitempty"`
+}
+
+// ConversationInfo is sent in conversation_update events for sidebar real-time updates
+type ConversationInfo struct {
+	ID                 uuid.UUID `json:"id"`
+	LastMessageContent string    `json:"last_message_content"`
+	LastMessageAt      string    `json:"last_message_at"`
 }
 
 // Client represents a connected WebSocket client
@@ -66,10 +74,11 @@ type Client struct {
 
 // Hub manages all connected WebSocket clients and room subscriptions
 type Hub struct {
-	clients      map[uuid.UUID]*Client
-	rooms        map[uuid.UUID]map[uuid.UUID]*Client // conversationID -> clients
-	register     chan *Client
-	unregister   chan *Client
-	mu           sync.RWMutex
-	presenceRepo repository.PresenceRepository
+	clients         map[uuid.UUID]*Client
+	rooms           map[uuid.UUID]map[uuid.UUID]*Client // conversationID -> clients
+	register        chan *Client
+	unregister      chan *Client
+	mu              sync.RWMutex
+	presenceRepo    repository.PresenceRepository
+	messageReadRepo repository.MessageReadRepository
 }

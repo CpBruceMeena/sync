@@ -7,23 +7,55 @@ export class WSClient {
   private handlers: Map<string, Set<MessageHandler>> = new Map();
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private url: string;
+  // Queue messages sent while connecting — they'll be flushed once the socket opens
+  private sendQueue: Array<Record<string, any>> = [];
 
   constructor() {
+    this.url = `${WS_BASE}/ws`;
+  }
+
+  /**
+   * Returns the full WS URL with the current token from localStorage.
+   * This ensures the token is always fresh, even after user switch.
+   */
+  private getUrl(): string {
     const token =
       typeof window !== "undefined"
         ? localStorage.getItem("access_token")
         : null;
-    this.url = `${WS_BASE}/ws?token=${token}`;
+    return `${this.url}?token=${token}`;
+  }
+
+  private flushQueue() {
+    if (this.sendQueue.length === 0) return;
+    const queue = this.sendQueue.slice();
+    this.sendQueue = [];
+    for (const msg of queue) {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify(msg));
+      }
+    }
   }
 
   connect() {
-    if (this.ws?.readyState === WebSocket.OPEN) return;
+    // Close any existing connection first
+    if (this.ws) {
+      this.ws.onopen = null;
+      this.ws.onclose = null;
+      this.ws.onerror = null;
+      this.ws.onmessage = null;
+      if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+        this.ws.close();
+      }
+    }
 
-    this.ws = new WebSocket(this.url);
+    const url = this.getUrl();
+    this.ws = new WebSocket(url);
 
     this.ws.onopen = () => {
       console.log("[WS] Connected");
       this.dispatch("connect", {});
+      this.flushQueue();
       if (this.reconnectTimer) {
         clearTimeout(this.reconnectTimer);
         this.reconnectTimer = null;
@@ -55,15 +87,24 @@ export class WSClient {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
-    this.ws?.close();
-    this.ws = null;
+    if (this.ws) {
+      this.ws.onopen = null;
+      this.ws.onclose = null;
+      this.ws.onerror = null;
+      this.ws.onmessage = null;
+      if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+        this.ws.close();
+      }
+      this.ws = null;
+    }
   }
 
   send(data: Record<string, any>) {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
     } else {
-      console.warn("[WS] Cannot send, not connected");
+      // Queue the message — it will be flushed once the socket opens
+      this.sendQueue.push(data);
     }
   }
 
@@ -82,13 +123,4 @@ export class WSClient {
   private dispatch(type: string, data: any) {
     this.handlers.get(type)?.forEach((handler) => handler(data));
   }
-}
-
-let wsInstance: WSClient | null = null;
-
-export function getWSClient(): WSClient {
-  if (!wsInstance) {
-    wsInstance = new WSClient();
-  }
-  return wsInstance;
 }

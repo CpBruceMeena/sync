@@ -8,19 +8,26 @@ import { useWebSocket } from "@/contexts/WebSocketContext";
 import { useSelectedConv } from "@/contexts/SelectedConvContext";
 import { CreateGroupDialog } from "./CreateGroupDialog";
 import { NotificationBadge } from "./NotificationBadge";
+import { ProfileDialog } from "./ProfileDialog";
+import { UserProfileDialog } from "./UserProfileDialog";
 import type { Conversation } from "@/types";
 import { DiscoveryDialog } from "./DiscoveryDialog";
 
 export function Sidebar() {
   const { user, logout } = useAuth();
-  const { onlineUsers, isConnected } = useWebSocket();
+  const { onlineUsers, isConnected, subscribe, sendMessage: wsSend } = useWebSocket();
   const { setSelectedConv } = useSelectedConv();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [showDiscovery, setShowDiscovery] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [showUserProfile, setShowUserProfile] = useState(false);
+  const [viewUser, setViewUser] = useState<import("@/types").User | null>(null);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
+  const [convTab, setConvTab] = useState<"all" | "private" | "group">("all");
 
+  // Fetch conversations on mount
   useEffect(() => {
     api
       .getConversations()
@@ -28,6 +35,45 @@ export function Sidebar() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  // Stable userId: always a string (never undefined) so the dependency array size never changes
+  const userId = user?.id ?? "";
+
+  // Subscribe to new_message events to update sidebar in real-time
+  useEffect(() => {
+    const unsub = subscribe("new_message", (data: import("@/types").WSMessage) => {
+      if (!data.conversation_id) return;
+
+      setConversations((prev) => {
+        const idx = prev.findIndex((c) => c.id === data.conversation_id);
+        if (idx === -1) return prev;
+
+        const conv = prev[idx];
+        const isOwnMessage = data.sender_id === userId;
+        const isActiveConv = conv.id === activeConvId;
+
+        const updated = {
+          ...conv,
+          last_message_content: data.content || conv.last_message_content,
+          last_message_at: data.data || conv.last_message_at || new Date().toISOString(),
+          updated_at: data.data || new Date().toISOString(),
+          // Increment unread only for OTHER users' messages when this conversation is not active
+          unread_count:
+            isActiveConv || isOwnMessage
+              ? conv.unread_count || 0
+              : (conv.unread_count || 0) + 1,
+        };
+
+        // Move to top of the list
+        const next = [...prev];
+        next.splice(idx, 1);
+        next.unshift(updated);
+        return next;
+      });
+    });
+
+    return unsub;
+  }, [subscribe, activeConvId, userId]);
 
   const handleCreateGroup = async (
     name: string,
@@ -50,7 +96,18 @@ export function Sidebar() {
 
   const handleSelect = (conv: Conversation) => {
     setActiveConvId(conv.id);
+    // Clear unread count locally
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === conv.id ? { ...c, unread_count: 0 } : c
+      )
+    );
     setSelectedConv(conv);
+    // Subscribe to the conversation room via WebSocket
+    wsSend({
+      type: "subscribe",
+      conversation_id: conv.id,
+    });
   };
 
   const isUserOnline = (userId: string) => onlineUsers.some((u) => u.user_id === userId);
@@ -101,23 +158,25 @@ export function Sidebar() {
           />
         </div>
 
+        {/* Conversation tabs */}
+        <div className="flex border-b border-[var(--border)] px-4 pt-2">
+          {(["all", "private", "group"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setConvTab(tab)}
+              className={`py-2 px-3 text-xs font-medium border-b-2 transition-colors capitalize ${
+                convTab === tab
+                  ? "border-[var(--primary)] text-[var(--foreground)]"
+                  : "border-transparent text-[var(--text-muted)] hover:text-[var(--foreground)]"
+              }`}
+            >
+              {tab === "all" ? "All" : tab === "private" ? "Direct" : "Rooms"}
+            </button>
+          ))}
+        </div>
+
         {/* Conversation list */}
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
-          <div className="flex items-center justify-between px-2 py-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-              Conversations
-            </span>
-            <button
-              onClick={() => setShowCreateGroup(true)}
-              className="w-6 h-6 rounded-lg bg-[var(--surface-3)] hover:bg-[var(--border-light)] flex items-center justify-center text-[var(--text-dim)] transition-colors"
-              title="Create Group"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            </button>
-          </div>
-
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="w-6 h-6 rounded-full border-2 border-[var(--primary)] border-t-transparent animate-spin" />
@@ -133,7 +192,9 @@ export function Sidebar() {
             </div>
           ) : (
             <AnimatePresence>
-              {conversations.map((conv) => {
+              {conversations
+                .filter((conv) => convTab === "all" || conv.type === convTab)
+                .map((conv) => {
                 const otherMember = conv.members?.find(
                   (m) => m.user_id !== user?.id
                 );
@@ -155,7 +216,18 @@ export function Sidebar() {
                     }`}
                   >
                     <div className="relative flex-shrink-0">
-                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center text-white font-semibold text-sm">
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (otherMember) {
+                            api.getUser(otherMember.user_id).then((u) => {
+                              setViewUser(u);
+                              setShowUserProfile(true);
+                            }).catch(() => {});
+                          }
+                        }}
+                        className="w-10 h-10 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] flex items-center justify-center text-white font-semibold text-sm cursor-pointer hover:opacity-80 transition-opacity"
+                      >
                         {displayName.charAt(0).toUpperCase()}
                       </div>
                       {conv.type === "private" && (
@@ -170,30 +242,40 @@ export function Sidebar() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-[var(--foreground)] truncate">
+                        <span className={`text-sm font-medium truncate ${
+                          (conv.unread_count || 0) > 0
+                            ? "text-[var(--foreground)] font-semibold"
+                            : "text-[var(--foreground)]"
+                        }`}>
                           {displayName}
                         </span>
-                        {conv.last_message_at && (
-                          <span className="text-[10px] text-[var(--text-muted)] flex-shrink-0">
-                            {new Date(conv.last_message_at).toLocaleTimeString(
-                              [],
-                              { hour: "2-digit", minute: "2-digit" }
-                            )}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {(conv.unread_count || 0) > 0 && (
+                            <span className="flex-shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] flex items-center justify-center">
+                              <span className="text-[10px] font-bold text-white leading-none">
+                                {(conv.unread_count || 0) > 99 ? "99+" : conv.unread_count}
+                              </span>
+                            </span>
+                          )}
+                          {conv.last_message_at && (
+                            <span className="text-[10px] text-[var(--text-muted)]">
+                              {new Date(conv.last_message_at).toLocaleTimeString(
+                                [],
+                                { hour: "2-digit", minute: "2-digit" }
+                              )}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {conv.type === "group" && (
-                          <span className="text-[10px] text-[var(--text-muted)]">
-                            {conv.members?.length || 0} members
-                          </span>
-                        )}
-                        {conv.last_message_content && (
-                          <span className="text-xs text-[var(--text-muted)] truncate">
-                            {conv.last_message_content}
-                          </span>
-                        )}
-                      </div>
+                      {conv.last_message_content && (
+                        <span className={`text-xs truncate block ${
+                          (conv.unread_count || 0) > 0
+                            ? "text-[var(--text-dim)] font-medium"
+                            : "text-[var(--text-muted)]"
+                        }`}>
+                          {conv.last_message_content}
+                        </span>
+                      )}
                     </div>
                   </motion.button>
                 );
@@ -204,28 +286,44 @@ export function Sidebar() {
 
         {/* User footer */}
         <div className="p-3 border-t border-[var(--border)]">
-          <div className="flex items-center gap-3 px-2">
-            <div className="relative">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--primary)] flex items-center justify-center text-white font-semibold text-xs">
-                {user?.username?.charAt(0).toUpperCase() || "U"}
+          <div className="flex items-center gap-3 px-2">              <button onClick={() => setShowProfile(true)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+              <div className="relative flex-shrink-0">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--primary)] flex items-center justify-center text-white font-semibold text-xs overflow-hidden">
+                  {user?.avatar_url ? (
+                    <img src={api.getFileUrl(user.avatar_url)} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    user?.username?.charAt(0).toUpperCase() || "U"
+                  )}
+                </div>
+                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-[var(--online)] border-2 border-[var(--surface)]" />
               </div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-[var(--online)] border-2 border-[var(--surface)]" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-[var(--foreground)] truncate">
-                {user?.username}
-              </p>
-              <p className="text-[10px] text-[var(--text-muted)]">Online</p>
-            </div>
-            <button
-              onClick={logout}
-              className="p-1.5 rounded-lg hover:bg-[var(--surface-3)] text-[var(--text-muted)] hover:text-[var(--error)] transition-colors"
-              title="Logout"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-[var(--foreground)] truncate">
+                  {user?.display_name || user?.username}
+                </p>
+                <p className="text-[10px] text-[var(--text-muted)]">{user?.status || "Online"}</p>
+              </div>
             </button>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setShowCreateGroup(true)}
+                className="p-1.5 rounded-lg hover:bg-[var(--surface-3)] text-[var(--text-muted)] hover:text-[var(--primary)] transition-colors"
+                title="Create Group"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+              <button
+                onClick={logout}
+                className="p-1.5 rounded-lg hover:bg-[var(--surface-3)] text-[var(--text-muted)] hover:text-[var(--error)] transition-colors"
+                title="Logout"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -240,6 +338,19 @@ export function Sidebar() {
       {showDiscovery && (
         <DiscoveryDialog
           onClose={() => setShowDiscovery(false)}
+        />
+      )}
+
+      {showProfile && (
+        <ProfileDialog
+          onClose={() => setShowProfile(false)}
+        />
+      )}
+
+      {showUserProfile && viewUser && (
+        <UserProfileDialog
+          user={viewUser}
+          onClose={() => { setShowUserProfile(false); setViewUser(null); }}
         />
       )}
     </>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 
 interface MessageInputProps {
@@ -11,6 +11,8 @@ interface MessageInputProps {
 export function MessageInput({ onSend, onSendFile }: MessageInputProps) {
   const [content, setContent] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [sending, setSending] = useState(false);
+  const sendingRef = useRef(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -18,20 +20,40 @@ export function MessageInput({ onSend, onSendFile }: MessageInputProps) {
     inputRef.current?.focus();
   }, []);
 
-  const handleSend = () => {
+  const handleSend = useCallback(async () => {
+    // Synchronous guard: prevents double-submit before React re-renders
+    if (sendingRef.current) return;
+
     if (selectedFile && onSendFile) {
-      onSendFile(selectedFile);
-      setSelectedFile(null);
+      sendingRef.current = true;
+      setSending(true);
+      try {
+        await onSendFile(selectedFile);
+      } finally {
+        setSelectedFile(null);
+        sendingRef.current = false;
+        setSending(false);
+      }
       return;
     }
 
     if (!content.trim()) return;
-    onSend(content.trim());
+
+    sendingRef.current = true;
+    setSending(true);
+    const text = content.trim();
     setContent("");
     if (inputRef.current) {
       inputRef.current.style.height = "auto";
     }
-  };
+
+    try {
+      await onSend(text);
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
+    }
+  }, [content, selectedFile, onSend, onSendFile]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -159,7 +181,7 @@ export function MessageInput({ onSend, onSendFile }: MessageInputProps) {
           onClick={handleSend}
           whileHover={{ scale: 1.05 }}
           whileTap={{ scale: 0.95 }}
-          disabled={!canSend}
+          disabled={!canSend || sending}
           className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] flex items-center justify-center text-white disabled:opacity-40 transition-opacity"
         >
           <svg

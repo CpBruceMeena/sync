@@ -43,11 +43,16 @@ func main() {
 
 	authService := auth.NewService(cfg.JWTSecret, cfg.AccessTTL, cfg.RefreshTTL)
 
+	// Create WebSocket hub first (services depend on it)
+	wsHub := websocket.NewHub(repos.Presence, repos.MessageRead)
+	go wsHub.Run()
+	wsHandler := websocket.NewWsHandler(wsHub, authService, repos)
+
 	// Create service layer
 	notifSvc := notifications.NewService(repos)
 	userSvc := users.NewService(repos)
-	messageSvc := messages.NewService(repos, notifSvc)
-	conversationSvc := conversations.NewService(repos, notifSvc)
+	messageSvc := messages.NewService(repos, notifSvc, wsHub)
+	conversationSvc := conversations.NewService(repos, notifSvc, wsHub)
 
 	// Create HTTP handlers
 	authHandler := auth.NewHandler(authService, repos)
@@ -55,10 +60,6 @@ func main() {
 	conversationsHandler := conversations.NewHandler(conversationSvc)
 	messagesHandler := messages.NewHandler(messageSvc)
 	notifHandler := notifications.NewHandler(notifSvc)
-
-	wsHub := websocket.NewHub(repos.Presence)
-	go wsHub.Run()
-	wsHandler := websocket.NewWsHandler(wsHub, authService, repos)
 
 	reactionSvc := reactions.NewService(repos, wsHub, notifSvc)
 	reactionsHandler := reactions.NewHandler(reactionSvc)

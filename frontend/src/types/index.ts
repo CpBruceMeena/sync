@@ -5,6 +5,14 @@ export interface User {
   display_name: string;
   avatar_url: string;
   status: string;
+  bio: string;
+}
+
+export interface ProfileUpdate {
+  display_name?: string;
+  avatar_url?: string;
+  status?: string;
+  bio?: string;
 }
 
 export interface TokenPair {
@@ -29,6 +37,7 @@ export interface Conversation {
   members?: ConversationMember[];
   last_message_content?: string;
   last_message_at?: string;
+  unread_count?: number;
 }
 
 export interface ConversationMember {
@@ -48,6 +57,7 @@ export interface Message {
   created_at: string;
   reactions?: MessageReaction[];
   attachments?: Attachment[];
+  read_by?: ReadReceiptInfo[];
 }
 
 export interface Attachment {
@@ -56,6 +66,12 @@ export interface Attachment {
   file_type: string;
   file_name: string;
   file_size: number;
+}
+
+export interface ReadReceiptInfo {
+  user_id: string;
+  username: string;
+  read_at: string;
 }
 
 export interface MessageReaction {

@@ -110,6 +110,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 			DisplayName: user.DisplayName,
 			AvatarURL:   user.AvatarUrl,
 			Status:      user.Status,
+			Bio:         user.Bio,
 		},
 		Token: tokens,
 	})
@@ -175,6 +176,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 			DisplayName: user.DisplayName,
 			AvatarURL:   user.AvatarUrl,
 			Status:      user.Status,
+			Bio:         user.Bio,
 		},
 		Token: tokens,
 	})
@@ -292,6 +294,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		DisplayName: user.DisplayName,
 		AvatarURL:   user.AvatarUrl,
 		Status:      user.Status,
+		Bio:         user.Bio,
 	})
 }
 

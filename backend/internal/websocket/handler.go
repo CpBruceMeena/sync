@@ -48,8 +48,8 @@ func (h *WsHandler) ServeWS(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("WebSocket connected: user=%s (%s)", claims.Username, claims.UserID)
 
-	// Subscribe to user's conversations
-	go h.subscribeToConversations(client)
+	// Subscribe to user's conversations (synchronous — ensures rooms are joined before ReadPump starts)
+	h.subscribeToConversations(client)
 
 	go client.WritePump()
 	go client.ReadPump()

@@ -69,7 +69,7 @@ export const api = {
   getUser: (id: string) =>
     request<import("../types").User>(`/api/users/${id}`),
 
-  updateProfile: (data: { display_name?: string; avatar_url?: string; status?: string }) =>
+  updateProfile: (data: { display_name?: string; avatar_url?: string; status?: string; bio?: string }) =>
     request<import("../types").User>("/api/users/me", {
       method: "PUT",
       body: JSON.stringify(data),
@@ -160,7 +160,16 @@ export const api = {
     return res.json() as Promise<import("../types").Attachment>;
   },
 
-  getFileUrl: (filename: string) => `${API_BASE}/api/files/${filename}`,
+  getFileUrl: (filename: string) =>
+    filename.startsWith("http://") || filename.startsWith("https://")
+      ? filename
+      : `${API_BASE}/api/files/${filename}`,
+
+  // Message Search
+  searchMessages: (conversationId: string, q: string, limit = 50, offset = 0) =>
+    request<import("../types").Message[]>(
+      `/api/conversations/${conversationId}/search?q=${encodeURIComponent(q)}&limit=${limit}&offset=${offset}`
+    ),
 
   // Discovery
   searchUsers: (q: string, limit = 20) =>
