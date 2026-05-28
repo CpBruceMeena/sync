@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
@@ -15,6 +16,12 @@ const (
 	pongWait       = 60 * time.Second
 	pingPeriod     = (pongWait * 9) / 10
 	maxMessageSize = 512 * 1024 // 512KB
+)
+
+// Message types the client can send to the server
+const (
+	WSSubscribe   = "subscribe"
+	WSUnsubscribe = "unsubscribe"
 )
 
 var Upgrader = websocket.Upgrader{
@@ -109,6 +116,20 @@ func (c *Client) handleMessage(msg WSMessage) {
 		}
 		data, _ := json.Marshal(msg)
 		c.Hub.BroadcastToRoom(msg.ConversationID, data, c.UserID)
+
+	case WSSubscribe:
+		// Subscribe to a specific conversation room (for newly created conversations)
+		if msg.ConversationID != uuid.Nil {
+			c.Hub.JoinRoom(msg.ConversationID, c)
+			log.Printf("[WS] User %s subscribed to conversation %s", c.Username, msg.ConversationID)
+		}
+
+	case WSUnsubscribe:
+		// Unsubscribe from a conversation room
+		if msg.ConversationID != uuid.Nil {
+			c.Hub.LeaveRoom(msg.ConversationID, c.UserID)
+			log.Printf("[WS] User %s unsubscribed from conversation %s", c.Username, msg.ConversationID)
+		}
 
 	default:
 		log.Printf("Unknown WS message type from %s: %s", c.Username, msg.Type)

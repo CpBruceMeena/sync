@@ -33,3 +33,34 @@ func (r *messageReadRepository) GetByConversation(ctx context.Context, convID uu
 		Find(&reads).Error
 	return reads, err
 }
+
+// GetUnreadCounts returns a map of conversation_id -> unread message count for a user.
+// Unread count is the number of messages created after the user's last_read_at.
+func (r *messageReadRepository) GetUnreadCounts(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]int64, error) {
+	type result struct {
+		ConversationID uuid.UUID
+		Count          int64
+	}
+	var rows []result
+	err := r.db.WithContext(ctx).Raw(`
+		SELECT
+			cm.conversation_id,
+			COUNT(m.id) AS count
+		FROM conversation_members cm
+		LEFT JOIN messages m ON m.conversation_id = cm.conversation_id
+		LEFT JOIN message_reads mr
+			ON mr.conversation_id = cm.conversation_id
+			AND mr.user_id = ?
+		WHERE cm.user_id = ?
+		AND (mr.last_read_at IS NULL OR m.created_at > mr.last_read_at)
+		GROUP BY cm.conversation_id
+	`, userID, userID).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	counts := make(map[uuid.UUID]int64, len(rows))
+	for _, r := range rows {
+		counts[r.ConversationID] = r.Count
+	}
+	return counts, nil
+}

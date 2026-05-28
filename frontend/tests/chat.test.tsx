@@ -20,7 +20,7 @@ describe("MessageBubble alignment", () => {
 
   it("should apply gradient background to own messages and surface to others", () => {
     // Verify the styling classes are swapped correctly
-    const ownBubbleClass = isOwn =>
+    const ownBubbleClass = (isOwn: boolean) =>
       isOwn
         ? "bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-tr-md"
         : "bg-[var(--surface-2)] border border-[var(--border)] text-[var(--foreground)] rounded-tl-md";

@@ -79,6 +79,7 @@ type PresenceRepository interface {
 type MessageReadRepository interface {
 	Upsert(ctx context.Context, convID, userID uuid.UUID) error
 	GetByConversation(ctx context.Context, convID uuid.UUID) ([]models.MessageRead, error)
+	GetUnreadCounts(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]int64, error)
 }
 
 // AttachmentRepository defines attachment data operations

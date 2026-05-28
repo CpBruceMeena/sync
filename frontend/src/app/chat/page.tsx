@@ -13,7 +13,7 @@ import type { Message, MessageReaction, WSMessage, User as UserType, ReadReceipt
 
 export default function ChatPage() {
   const { user } = useAuth();
-  const { subscribe, sendMessage, onlineUsers } = useWebSocket();
+  const { subscribe, sendMessage: wsSend, onlineUsers } = useWebSocket();
   const { selectedConv } = useSelectedConv();
   const [messages, setMessages] = useState<Message[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -25,6 +25,9 @@ export default function ChatPage() {
   const [searching, setSearching] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
+  // Stable ref for the current user ID to avoid timing issues with alignment checks
+  const userIdRef = useRef(user?.id || "");
+  userIdRef.current = user?.id || userIdRef.current;
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -50,12 +53,22 @@ export default function ChatPage() {
     if (!selectedConv || messages.length === 0) return;
 
     const latestMsg = messages[messages.length - 1];
-    sendMessage({
+    wsSend({
       type: "read_receipt",
       conversation_id: selectedConv.id,
       message_id: latestMsg.id,
     });
   }, [selectedConv, messages.length > 0 ? messages[messages.length - 1]?.id : null]);
+
+  // Subscribe to conversation room via WebSocket when selected
+  useEffect(() => {
+    if (!selectedConv) return;
+    // Tell the backend to subscribe us to this conversation's room
+    wsSend({
+      type: "subscribe",
+      conversation_id: selectedConv.id,
+    });
+  }, [selectedConv?.id]);
 
   // Subscribe to new messages via WebSocket (other users' messages)
   useEffect(() => {
@@ -221,9 +234,14 @@ export default function ChatPage() {
 
       try {
         const msg = await api.sendMessage(selectedConv.id, content);
-        setMessages((prev) =>
-          prev.map((m) => (m.id === tempId ? msg : m))
-        );
+        setMessages((prev) => {
+          // If the real message already exists (e.g. delivered via WebSocket first),
+          // just remove the temp placeholder to avoid duplicate keys
+          if (prev.some((m) => m.id === msg.id)) {
+            return prev.filter((m) => m.id !== tempId);
+          }
+          return prev.map((m) => (m.id === tempId ? msg : m));
+        });
       } catch (err) {
         console.error("Failed to send message:", err);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
@@ -284,9 +302,14 @@ export default function ChatPage() {
           }],
         };
 
-        setMessages((prev) =>
-          prev.map((m) => (m.id === tempId ? updatedMsg : m))
-        );
+        setMessages((prev) => {
+          // If the real message already exists (e.g. delivered via WebSocket first),
+          // just remove the temp placeholder to avoid duplicate keys
+          if (prev.some((m) => m.id === updatedMsg.id)) {
+            return prev.filter((m) => m.id !== tempId);
+          }
+          return prev.map((m) => (m.id === tempId ? updatedMsg : m));
+        });
       } catch (err) {
         console.error("Failed to send file:", err);
         setMessages((prev) => prev.filter((m) => m.id !== tempId));
@@ -297,15 +320,16 @@ export default function ChatPage() {
 
   if (!selectedConv) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center bg-[var(--background)]">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="text-center space-y-4"
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="text-center space-y-6"
         >
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-[var(--surface-3)]">
+          <div className="inline-flex items-center justify-center w-24 h-24 rounded-3xl bg-gradient-to-br from-[var(--surface-3)] to-[var(--surface-2)] border border-[var(--border)] shadow-lg">
             <svg
-              className="w-10 h-10 text-[var(--text-muted)]"
+              className="w-12 h-12 text-[var(--text-muted)]"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -318,20 +342,25 @@ export default function ChatPage() {
               />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-[var(--foreground)]">
-            Select a Conversation
-          </h2>
-          <p className="text-sm text-[var(--text-muted)] max-w-sm">
-            Choose a conversation from the sidebar or start a new one to begin
-            chatting
-          </p>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-[var(--foreground)] tracking-tight">
+              Select a Conversation
+            </h2>
+            <p className="text-sm text-[var(--text-muted)] max-w-xs mx-auto leading-relaxed">
+              Choose a conversation from the sidebar or discover new people to start chatting
+            </p>
+          </div>
+          <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-muted)]">
+            <kbd className="px-2 py-1 rounded-md bg-[var(--surface-3)] border border-[var(--border)] text-[10px] font-mono">Ctrl+K</kbd>
+            <span>to search conversations</span>
+          </div>
         </motion.div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col min-w-0">
+    <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
       {/* Chat header */}
       <div className="glass px-6 py-3 flex items-center gap-3 border-b border-[var(--border)]">
         {searchMode ? (
@@ -467,7 +496,7 @@ export default function ChatPage() {
       )}
 
       {/* Messages */}
-      <div ref={messagesRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-0.5 smooth-scroll">
+      <div ref={messagesRef} className="flex-1 overflow-y-auto min-h-0 px-4 py-4 space-y-0.5 smooth-scroll">
         {loadingMessages ? (
           <div className="flex items-center justify-center h-full">
             <div className="w-8 h-8 rounded-full border-2 border-[var(--primary)] border-t-transparent animate-spin" />
@@ -498,9 +527,9 @@ export default function ChatPage() {
                   >
                     <MessageBubble
                       message={msg}
-                      isOwn={msg.sender_id === user?.id}
+                      isOwn={msg.sender_id?.toLowerCase() === userIdRef.current?.toLowerCase()}
                       isGroup={selectedConv.type === "group"}
-                      userId={user?.id || ""}
+                      userId={userIdRef.current}
                       onReact={handleReact}
                     />
                   </motion.div>
@@ -598,6 +627,8 @@ function MessageBubble({
   userId: string;
   onReact: (messageId: string, emoji: string) => void;
 }) {
+  // Debug: log alignment check values for E2E diagnosis
+  // console.log(`[ALIGN] id=${message.id.slice(0,8)} sender_id="${message.sender_id}" userId="${userId}" isOwn=${isOwn} match=${message.sender_id?.toLowerCase() === userId?.toLowerCase()}`);
   // Group reactions by emoji
   const reactionSummary = message.reactions?.reduce<
     Record<string, { count: number; hasReacted: boolean }>
@@ -626,21 +657,21 @@ function MessageBubble({
     <div
       className={`flex ${isOwn ? "justify-end" : "justify-start"} message-enter w-full`}
     >
-      <div className="max-w-[70%] flex flex-col gap-1">
+      <div className="max-w-[75%] lg:max-w-[65%] flex flex-col gap-1">
         <div
-          className={`rounded-2xl px-4 py-2 ${
+          className={`rounded-2xl px-4 py-2.5 shadow-sm ${
             isOwn
-              ? "bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-tr-md"
-              : "bg-[var(--surface-2)] border border-[var(--border)] text-[var(--foreground)] rounded-tl-md"
+              ? "bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] text-white rounded-br-md shadow-[var(--primary)]/10"
+              : "bg-[var(--surface-2)] border border-[var(--border)] text-[var(--foreground)] rounded-bl-md shadow-black/5"
           }`}
         >
           {isGroup && isOwn && (
-            <p className="text-xs font-medium text-[var(--text-muted)] mb-1">
+            <p className="text-[11px] font-medium text-white/60 mb-1">
               You
             </p>
           )}
           {isGroup && !isOwn && message.sender_username && (
-            <p className="text-xs font-medium text-[var(--accent-light)] mb-1">
+            <p className="text-[11px] font-semibold text-[var(--accent-light)] mb-1">
               {message.sender_username}
             </p>
           )}
@@ -741,27 +772,27 @@ function MessageBubble({
         </div>
 
         {/* Reactions */}
-        <div className="flex items-center gap-1 pl-1 mt-1">
-          {reactionSummary && Object.keys(reactionSummary).length > 0 && (
-            <>
-              {Object.entries(reactionSummary).map(([emoji, { count, hasReacted }]) => (
-                <button
-                  key={emoji}
-                  onClick={() => onReact(message.id, emoji)}
-                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs transition-colors ${
-                    hasReacted
-                      ? "bg-[var(--primary)]/10 border border-[var(--primary)]/30"
-                      : "bg-[var(--surface-3)] border border-[var(--border)] hover:bg-[var(--surface-2)]"
-                  }`}
-                >
-                  <span>{emoji}</span>
-                  {count > 1 && (
-                    <span className="text-[10px] text-[var(--text-muted)]">{count}</span>
-                  )}
-                </button>
-              ))}
-            </>
-          )}
+        {reactionSummary && Object.keys(reactionSummary).length > 0 && (
+          <div className={`flex items-center gap-1 ${isOwn ? "justify-end mr-1" : "ml-1"}`}>
+            {Object.entries(reactionSummary).map(([emoji, { count, hasReacted }]) => (
+              <button
+                key={emoji}
+                onClick={() => onReact(message.id, emoji)}
+                className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-xs transition-all duration-150 ${
+                  hasReacted
+                    ? "bg-[var(--primary)]/10 border border-[var(--primary)]/30 scale-105"
+                    : "bg-[var(--surface-3)] border border-[var(--border)] hover:bg-[var(--surface-2)] hover:scale-105"
+                }`}
+              >
+                <span>{emoji}</span>
+                {count > 1 && (
+                  <span className="text-[10px] text-[var(--text-muted)] font-medium">{count}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className={`flex items-center gap-1 ${isOwn ? "justify-end" : "justify-start"}`}>
           <ReactionPicker messageId={message.id} onReact={onReact} />
         </div>
       </div>

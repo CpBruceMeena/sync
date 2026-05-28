@@ -37,6 +37,7 @@ export interface Conversation {
   members?: ConversationMember[];
   last_message_content?: string;
   last_message_at?: string;
+  unread_count?: number;
 }
 
 export interface ConversationMember {

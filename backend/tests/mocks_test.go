@@ -341,6 +341,7 @@ func (m *mockAttachmentRepo) GetByMessageID(ctx context.Context, messageID uuid.
 type mockMessageReadRepo struct {
 	upsertFn            func(ctx context.Context, convID, userID uuid.UUID) error
 	getByConversationFn func(ctx context.Context, convID uuid.UUID) ([]models.MessageRead, error)
+	getUnreadCountsFn   func(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]int64, error)
 }
 
 func (m *mockMessageReadRepo) Upsert(ctx context.Context, convID, userID uuid.UUID) error {
@@ -352,6 +353,12 @@ func (m *mockMessageReadRepo) Upsert(ctx context.Context, convID, userID uuid.UU
 func (m *mockMessageReadRepo) GetByConversation(ctx context.Context, convID uuid.UUID) ([]models.MessageRead, error) {
 	if m.getByConversationFn != nil {
 		return m.getByConversationFn(ctx, convID)
+	}
+	return nil, nil
+}
+func (m *mockMessageReadRepo) GetUnreadCounts(ctx context.Context, userID uuid.UUID) (map[uuid.UUID]int64, error) {
+	if m.getUnreadCountsFn != nil {
+		return m.getUnreadCountsFn(ctx, userID)
 	}
 	return nil, nil
 }

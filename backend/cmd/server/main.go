@@ -52,7 +52,7 @@ func main() {
 	notifSvc := notifications.NewService(repos)
 	userSvc := users.NewService(repos)
 	messageSvc := messages.NewService(repos, notifSvc, wsHub)
-	conversationSvc := conversations.NewService(repos, notifSvc)
+	conversationSvc := conversations.NewService(repos, notifSvc, wsHub)
 
 	// Create HTTP handlers
 	authHandler := auth.NewHandler(authService, repos)

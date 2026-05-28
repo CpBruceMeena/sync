@@ -15,7 +15,7 @@ import { DiscoveryDialog } from "./DiscoveryDialog";
 
 export function Sidebar() {
   const { user, logout } = useAuth();
-  const { onlineUsers, isConnected } = useWebSocket();
+  const { onlineUsers, isConnected, subscribe, sendMessage: wsSend } = useWebSocket();
   const { setSelectedConv } = useSelectedConv();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,6 +27,7 @@ export function Sidebar() {
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [convTab, setConvTab] = useState<"all" | "private" | "group">("all");
 
+  // Fetch conversations on mount
   useEffect(() => {
     api
       .getConversations()
@@ -34,6 +35,45 @@ export function Sidebar() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  // Stable userId: always a string (never undefined) so the dependency array size never changes
+  const userId = user?.id ?? "";
+
+  // Subscribe to new_message events to update sidebar in real-time
+  useEffect(() => {
+    const unsub = subscribe("new_message", (data: import("@/types").WSMessage) => {
+      if (!data.conversation_id) return;
+
+      setConversations((prev) => {
+        const idx = prev.findIndex((c) => c.id === data.conversation_id);
+        if (idx === -1) return prev;
+
+        const conv = prev[idx];
+        const isOwnMessage = data.sender_id === userId;
+        const isActiveConv = conv.id === activeConvId;
+
+        const updated = {
+          ...conv,
+          last_message_content: data.content || conv.last_message_content,
+          last_message_at: data.data || conv.last_message_at || new Date().toISOString(),
+          updated_at: data.data || new Date().toISOString(),
+          // Increment unread only for OTHER users' messages when this conversation is not active
+          unread_count:
+            isActiveConv || isOwnMessage
+              ? conv.unread_count || 0
+              : (conv.unread_count || 0) + 1,
+        };
+
+        // Move to top of the list
+        const next = [...prev];
+        next.splice(idx, 1);
+        next.unshift(updated);
+        return next;
+      });
+    });
+
+    return unsub;
+  }, [subscribe, activeConvId, userId]);
 
   const handleCreateGroup = async (
     name: string,
@@ -56,7 +96,18 @@ export function Sidebar() {
 
   const handleSelect = (conv: Conversation) => {
     setActiveConvId(conv.id);
+    // Clear unread count locally
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.id === conv.id ? { ...c, unread_count: 0 } : c
+      )
+    );
     setSelectedConv(conv);
+    // Subscribe to the conversation room via WebSocket
+    wsSend({
+      type: "subscribe",
+      conversation_id: conv.id,
+    });
   };
 
   const isUserOnline = (userId: string) => onlineUsers.some((u) => u.user_id === userId);
@@ -119,7 +170,7 @@ export function Sidebar() {
                   : "border-transparent text-[var(--text-muted)] hover:text-[var(--foreground)]"
               }`}
             >
-              {tab === "all" ? "All" : tab === "private" ? "1-1 Chats" : "Groups"}
+              {tab === "all" ? "All" : tab === "private" ? "Direct" : "Rooms"}
             </button>
           ))}
         </div>
@@ -191,20 +242,37 @@ export function Sidebar() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-medium text-[var(--foreground)] truncate">
+                        <span className={`text-sm font-medium truncate ${
+                          (conv.unread_count || 0) > 0
+                            ? "text-[var(--foreground)] font-semibold"
+                            : "text-[var(--foreground)]"
+                        }`}>
                           {displayName}
                         </span>
-                        {conv.last_message_at && (
-                          <span className="text-[10px] text-[var(--text-muted)] flex-shrink-0">
-                            {new Date(conv.last_message_at).toLocaleTimeString(
-                              [],
-                              { hour: "2-digit", minute: "2-digit" }
-                            )}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          {(conv.unread_count || 0) > 0 && (
+                            <span className="flex-shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-gradient-to-r from-[var(--primary)] to-[var(--accent)] flex items-center justify-center">
+                              <span className="text-[10px] font-bold text-white leading-none">
+                                {(conv.unread_count || 0) > 99 ? "99+" : conv.unread_count}
+                              </span>
+                            </span>
+                          )}
+                          {conv.last_message_at && (
+                            <span className="text-[10px] text-[var(--text-muted)]">
+                              {new Date(conv.last_message_at).toLocaleTimeString(
+                                [],
+                                { hour: "2-digit", minute: "2-digit" }
+                              )}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       {conv.last_message_content && (
-                        <span className="text-xs text-[var(--text-muted)] truncate block">
+                        <span className={`text-xs truncate block ${
+                          (conv.unread_count || 0) > 0
+                            ? "text-[var(--text-dim)] font-medium"
+                            : "text-[var(--text-muted)]"
+                        }`}>
                           {conv.last_message_content}
                         </span>
                       )}

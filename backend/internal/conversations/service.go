@@ -8,6 +8,7 @@ import (
 	"github.com/CpBruceMeena/sync/internal/models"
 	"github.com/CpBruceMeena/sync/internal/notifications"
 	"github.com/CpBruceMeena/sync/internal/repository"
+	"github.com/CpBruceMeena/sync/internal/websocket"
 	"github.com/google/uuid"
 )
 
@@ -15,11 +16,12 @@ import (
 type Service struct {
 	repos        *repository.Repositories
 	notifService *notifications.Service
+	hub          *websocket.Hub
 }
 
 // NewService creates a new conversation service
-func NewService(repos *repository.Repositories, notifService *notifications.Service) *Service {
-	return &Service{repos: repos, notifService: notifService}
+func NewService(repos *repository.Repositories, notifService *notifications.Service, hub *websocket.Hub) *Service {
+	return &Service{repos: repos, notifService: notifService, hub: hub}
 }
 
 // ListConversations returns all conversations for a user with member and message info
@@ -29,12 +31,19 @@ func (s *Service) ListConversations(ctx context.Context, userID uuid.UUID) ([]Co
 		return nil, err
 	}
 
+	// Fetch unread counts for all conversations at once
+	unreadCounts, _ := s.repos.MessageRead.GetUnreadCounts(ctx, userID)
+	if unreadCounts == nil {
+		unreadCounts = make(map[uuid.UUID]int64)
+	}
+
 	response := make([]ConversationResponse, 0, len(convs))
 	for _, conv := range convs {
 		resp := convToResponse(conv)
 		resp.Members = s.getMembers(conv.ID)
 		resp.LastMessageContent = s.getLastMessageContent(conv.ID)
 		resp.LastMessageAt = s.getLastMessageAt(conv.ID)
+		resp.UnreadCount = unreadCounts[conv.ID]
 		response = append(response, resp)
 	}
 	return response, nil
@@ -86,6 +95,13 @@ func (s *Service) CreatePrivateConversation(ctx context.Context, userID uuid.UUI
 	})
 
 	resp := convToResponse(*conv)
+
+	// Subscribe both users to the conversation room via WebSocket
+	if s.hub != nil {
+		s.hub.SubscribeUserToConversation(conv.ID, userID)
+		s.hub.SubscribeUserToConversation(conv.ID, otherUser.ID)
+	}
+
 	return &resp, nil
 }
 
@@ -109,11 +125,13 @@ func (s *Service) CreateGroupConversation(ctx context.Context, userID uuid.UUID,
 	})
 
 	// Add members
+	var memberUsers []*models.User
 	for _, memberUsername := range memberUsernames {
 		memberUser, err := s.repos.Users.GetByUsername(ctx, memberUsername)
 		if err != nil {
 			continue
 		}
+		memberUsers = append(memberUsers, memberUser)
 		s.repos.Conversations.AddMember(ctx, &models.ConversationMember{
 			ConversationID: conv.ID,
 			UserID:         memberUser.ID,
@@ -122,6 +140,15 @@ func (s *Service) CreateGroupConversation(ctx context.Context, userID uuid.UUID,
 	}
 
 	resp := convToResponse(*conv)
+
+	// Subscribe all members to the conversation room via WebSocket
+	if s.hub != nil {
+		s.hub.SubscribeUserToConversation(conv.ID, userID)
+		for _, memberUser := range memberUsers {
+			s.hub.SubscribeUserToConversation(conv.ID, memberUser.ID)
+		}
+	}
+
 	return &resp, nil
 }
 
@@ -138,6 +165,11 @@ func (s *Service) AddMember(ctx context.Context, convID uuid.UUID, username stri
 		Role:           "member",
 	}); err != nil {
 		return err
+	}
+
+	// Subscribe the new member to the conversation room via WebSocket
+	if s.hub != nil {
+		s.hub.SubscribeUserToConversation(convID, user.ID)
 	}
 
 	// Send notification to the new member

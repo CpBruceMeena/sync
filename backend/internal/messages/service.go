@@ -105,7 +105,7 @@ func (s *Service) ListMessages(ctx context.Context, convID uuid.UUID, cursor uui
 }
 
 // SendMessage creates a new message and sends notifications to conversation members
-func (s *Service) SendMessage(ctx context.Context, senderID uuid.UUID, convID uuid.UUID, content string, msgType string, attachment *AttachmentUpload) (*models.Message, error) {
+func (s *Service) SendMessage(ctx context.Context, senderID uuid.UUID, convID uuid.UUID, content string, msgType string, attachment *AttachmentUpload) (*MessageResponse, error) {
 	if msgType == "" {
 		msgType = "text"
 	}
@@ -120,7 +120,7 @@ func (s *Service) SendMessage(ctx context.Context, senderID uuid.UUID, convID uu
 		return nil, err
 	}
 
-	// Get sender username for broadcast
+	// Get sender username for broadcast and response
 	senderUsername := ""
 	sender, err := s.repos.Users.GetByID(ctx, senderID)
 	if err == nil && sender != nil {
@@ -143,6 +143,26 @@ func (s *Service) SendMessage(ctx context.Context, senderID uuid.UUID, convID uu
 
 	// Broadcast message to conversation room via WebSocket
 	if s.hub != nil {
+		// Ensure all conversation members who are currently connected are subscribed to the room.
+		// This handles the case where a conversation was created after the member's initial
+		// WebSocket subscription (e.g., a new private conversation).
+		members, err := s.repos.Conversations.GetMembers(ctx, convID)
+		if err != nil {
+			log.Printf("[WS] Error getting members for broadcast: %v", err)
+		} else {
+			for _, member := range members {
+				client := s.hub.GetClient(member.UserID)
+				if client != nil {
+					log.Printf("[WS] Subscribing user %s (%s) to conv %s", member.UserID, member.UserID, convID)
+					s.hub.JoinRoom(convID, client)
+				} else {
+					log.Printf("[WS] User %s is not connected via WebSocket, skipping room join", member.UserID)
+				}
+			}
+		}
+
+		log.Printf("[WS] Broadcasting message %s to conv %s (%d members)", msg.ID, convID, len(members))
+
 		wsMsg := websocket.WSMessage{
 			Type:           websocket.TypeNewMessage,
 			ConversationID: convID,
@@ -151,17 +171,47 @@ func (s *Service) SendMessage(ctx context.Context, senderID uuid.UUID, convID uu
 			Content:        content,
 			MessageID:      msg.ID,
 			Data:           msg.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			Conversation: &websocket.ConversationInfo{
+				ID:                 convID,
+				LastMessageContent: content,
+				LastMessageAt:      msg.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			},
 		}
 		data, err := json.Marshal(wsMsg)
 		if err == nil {
-			s.hub.BroadcastToRoom(convID, data, senderID) // Skip sender (they get the message via API response)
+			// Broadcast to ALL room members (including sender) so the sidebar updates for everyone
+			s.hub.BroadcastToRoomAll(convID, data)
 		}
 	}
 
 	// Notify conversation members (except sender)
 	s.notifyMembers(ctx, senderID, convID, content)
 
-	return msg, nil
+	// Build a proper response with sender_username included
+	resp := &MessageResponse{
+		ID:             msg.ID,
+		ConversationID: msg.ConversationID,
+		SenderID:       msg.SenderID,
+		SenderUsername: senderUsername,
+		Content:        msg.Content,
+		Type:           msg.Type,
+		CreatedAt:      msg.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+	}
+
+	// If attachment was saved, add it to the response
+	if attachment != nil {
+		resp.Attachments = []AttachmentResponse{
+			{
+				ID:       uuid.Nil, // Will be the actual ID if saved
+				FileURL:  attachment.FileURL,
+				FileType: attachment.FileType,
+				FileName: attachment.FileName,
+				FileSize: attachment.FileSize,
+			},
+		}
+	}
+
+	return resp, nil
 }
 
 // notifyMembers sends notifications to all conversation members except the sender

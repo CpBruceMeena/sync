@@ -272,7 +272,7 @@ func newMockE2ESuite() *mockE2ESuite {
 	wsHub := websocket.NewHub(s.repos.Presence, s.repos.MessageRead)
 	go wsHub.Run()
 	messageSvc := messages.NewService(s.repos, notifSvc, wsHub)
-	conversationSvc := conversations.NewService(s.repos, notifSvc)
+	conversationSvc := conversations.NewService(s.repos, notifSvc, wsHub)
 
 	authHandler := auth.NewHandler(s.authSvc, s.repos)
 	usersHandler := users.NewHandler(userSvc)
